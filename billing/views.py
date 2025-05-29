@@ -2,6 +2,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Sum
+from django_filters.rest_framework import DjangoFilterBackend
 from .models import ImportSnapshot, Customer, Subscription, Resource, Meter, CostEntry
 from .serializers import (
     ImportSnapshotSerializer,
@@ -12,6 +13,8 @@ from .serializers import (
     CostEntrySerializer,
 )
 from .permissions import PublicEndpointPermission
+from .filters import CostEntryFilter
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 
 class ImportSnapshotViewSet(viewsets.ModelViewSet):
@@ -44,36 +47,27 @@ class MeterViewSet(viewsets.ModelViewSet):
     permission_classes = [PublicEndpointPermission]
 
 
+@extend_schema(
+    parameters=[
+        OpenApiParameter(name="resourceGroupName", location=OpenApiParameter.QUERY, required=False, type=str),
+        OpenApiParameter(name="subscriptionName", location=OpenApiParameter.QUERY, required=False, type=str),
+        OpenApiParameter(name="meterCategory", location=OpenApiParameter.QUERY, required=False, type=str),
+        OpenApiParameter(name="meterSubCategory", location=OpenApiParameter.QUERY, required=False, type=str),
+        OpenApiParameter(name="serviceFamily", location=OpenApiParameter.QUERY, required=False, type=str),
+        OpenApiParameter(name="resourceLocation", location=OpenApiParameter.QUERY, required=False, type=str),
+        OpenApiParameter(name="chargeType", location=OpenApiParameter.QUERY, required=False, type=str),
+        OpenApiParameter(name="pricingModel", location=OpenApiParameter.QUERY, required=False, type=str),
+        OpenApiParameter(name="publisherName", location=OpenApiParameter.QUERY, required=False, type=str),
+        OpenApiParameter(name="costCenter", location=OpenApiParameter.QUERY, required=False, type=str),
+        OpenApiParameter(name="tags", location=OpenApiParameter.QUERY, required=False, type=str),
+    ]
+)
 class CostEntryViewSet(viewsets.ModelViewSet):
     queryset = CostEntry.objects.all()
     serializer_class = CostEntrySerializer
     permission_classes = [PublicEndpointPermission]
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        params = self.request.query_params
-        mapping = {
-            'resourceGroupName': 'resource__resource_group',
-            'subscriptionName': 'subscription__name',
-            'meterCategory': 'meter__category',
-            'meterSubCategory': 'meter__subcategory',
-            'serviceFamily': 'meter__service_family',
-            'resourceLocation': 'resource__location',
-            'chargeType': 'charge_type',
-            'pricingModel': 'pricing_model',
-            'publisherName': 'publisher_name',
-            'costCenter': 'cost_center',
-        }
-
-        for param, field in mapping.items():
-            value = params.get(param)
-            if value:
-                queryset = queryset.filter(**{field: value})
-
-        tags = params.get('tags')
-        if tags:
-            queryset = queryset.filter(tags__contains=tags)
-        return queryset
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = CostEntryFilter
 
     @action(detail=False)
     def aggregate(self, request):
