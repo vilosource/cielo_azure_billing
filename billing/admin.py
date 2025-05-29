@@ -28,13 +28,36 @@ class ResourceAdmin(admin.ModelAdmin):
 
 @admin.register(Meter)
 class MeterAdmin(admin.ModelAdmin):
-    list_display = ('meter_id', 'name', 'category', 'subcategory', 'unit')
-    search_fields = ('meter_id', 'name', 'category')
+    list_display = ('meter_id', 'name', 'category', 'subcategory', 'service_family', 'unit')
+    search_fields = ('meter_id', 'name', 'category', 'service_family')
 
 
 @admin.register(CostEntry)
 class CostEntryAdmin(admin.ModelAdmin):
-    list_display = ('date', 'subscription', 'resource', 'meter', 'cost_in_usd')
-    list_filter = ('snapshot', 'date', 'subscription', 'resource')
+    list_display = (
+        'date',
+        'subscription',
+        'resource',
+        'meter',
+        'charge_type',
+        'pricing_model',
+        'publisher_name',
+        'cost_center',
+        'cost_in_usd',
+    )
+    list_filter = (
+        'snapshot',
+        'date',
+        'subscription',
+        'resource__resource_group',
+        'resource__location',
+        'meter__category',
+        'meter__subcategory',
+        'meter__service_family',
+        'charge_type',
+        'pricing_model',
+        'publisher_name',
+        'cost_center',
+    )
     search_fields = ('subscription__name', 'resource__name')
     readonly_fields = ('snapshot',)
