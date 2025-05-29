@@ -4,7 +4,7 @@ from .models import ImportSnapshot, Customer, Subscription, Resource, Meter, Cos
 
 @admin.register(ImportSnapshot)
 class ImportSnapshotAdmin(admin.ModelAdmin):
-    list_display = ('file_name', 'snapshot_date')
+    list_display = ('file_name', 'snapshot_date', 'created_at')
     search_fields = ('file_name',)
 
 

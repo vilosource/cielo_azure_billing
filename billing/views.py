@@ -1,3 +1,4 @@
+import datetime
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -14,6 +15,7 @@ from .serializers import (
 )
 from .permissions import PublicEndpointPermission
 from .filters import CostEntryFilter
+from .utils import get_latest_snapshot_for_date
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 
@@ -68,6 +70,22 @@ class CostEntryViewSet(viewsets.ModelViewSet):
     permission_classes = [PublicEndpointPermission]
     filter_backends = [DjangoFilterBackend]
     filterset_class = CostEntryFilter
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        date_str = self.request.query_params.get('date')
+        if date_str:
+            try:
+                billing_date = datetime.date.fromisoformat(date_str)
+            except ValueError:
+                return queryset.none()
+
+            snapshot = get_latest_snapshot_for_date(billing_date)
+            if snapshot:
+                queryset = queryset.filter(snapshot=snapshot, date=billing_date)
+            else:
+                queryset = queryset.none()
+        return queryset
 
     @action(detail=False)
     def aggregate(self, request):
