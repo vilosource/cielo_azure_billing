@@ -66,11 +66,15 @@ class CostCsvImporter:
                                 'name': row.get('meterName'),
                                 'category': row.get('meterCategory'),
                                 'subcategory': row.get('meterSubCategory'),
+                                'service_family': row.get('serviceFamily'),
                                 'unit': row.get('unitOfMeasure'),
                             },
                         )
                         if created:
                             logger.info('Created new meter: %s', meter.meter_id)
+                        elif row.get('serviceFamily') and meter.service_family != row.get('serviceFamily'):
+                            meter.service_family = row.get('serviceFamily')
+                            meter.save(update_fields=['service_family'])
 
                         # Parse the date using our helper function
                         parsed_date = parse_date(row.get('date'))
@@ -92,6 +96,8 @@ class CostCsvImporter:
                             payg_price=row.get('PayGPrice') or 0,
                             pricing_model=row.get('pricingModel'),
                             charge_type=row.get('chargeType'),
+                            publisher_name=row.get('publisherName'),
+                            cost_center=row.get('costCenter'),
                             tags=row.get('tags') or None,
                         )
                         logger.debug('Created cost entry: %s', cost_entry.id)

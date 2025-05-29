@@ -41,6 +41,7 @@ class Meter(models.Model):
     name = models.CharField(max_length=255)
     category = models.CharField(max_length=255)
     subcategory = models.CharField(max_length=255, null=True, blank=True)
+    service_family = models.CharField(max_length=255, null=True, blank=True)
     unit = models.CharField(max_length=64)
 
     def __str__(self):
@@ -61,6 +62,8 @@ class CostEntry(models.Model):
     payg_price = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True)
     pricing_model = models.CharField(max_length=64, null=True, blank=True)
     charge_type = models.CharField(max_length=64, null=True, blank=True)
+    publisher_name = models.CharField(max_length=255, null=True, blank=True)
+    cost_center = models.CharField(max_length=255, null=True, blank=True)
     tags = models.JSONField(null=True, blank=True)
 
     def __str__(self):
