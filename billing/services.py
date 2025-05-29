@@ -1,65 +1,107 @@
 import csv
 import logging
+import datetime
 from .models import ImportSnapshot, Customer, Subscription, Resource, Meter, CostEntry
 
 logger = logging.getLogger(__name__)
 
+def parse_date(date_str):
+    """Convert date from MM/DD/YYYY to a date object."""
+    try:
+        if date_str:
+            # Try to parse the date in MM/DD/YYYY format
+            dt = datetime.datetime.strptime(date_str, '%m/%d/%Y')
+            return dt.date()  # Return date object instead of string
+        return None
+    except ValueError:
+        logger.error('Invalid date format: %s', date_str)
+        return None
 
 class CostCsvImporter:
     def __init__(self, file_path):
         self.file_path = file_path
 
     def import_file(self):
-        snapshot = ImportSnapshot.objects.create(file_name=self.file_path)
-        with open(self.file_path, newline='', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile)
-            count = 0
-            for row in reader:
-                customer, _ = Customer.objects.get_or_create(
-                    tenant_id=row.get('customerTenantId')
-                )
+        logger.info('Starting import from %s', self.file_path)
+        try:
+            snapshot = ImportSnapshot.objects.create(file_name=self.file_path)
+            logger.info('Created snapshot record: %s', snapshot.id)
+        except Exception as e:
+            logger.error('Failed to create snapshot: %s', e)
+            raise
 
-                subscription, _ = Subscription.objects.get_or_create(
-                    subscription_id=row.get('SubscriptionId'),
-                    defaults={'name': row.get('subscriptionName'), 'customer': customer},
-                )
+        try:
+            with open(self.file_path, newline='', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                count = 0
+                for row in reader:
+                    try:
+                        customer, created = Customer.objects.get_or_create(
+                            tenant_id=row.get('customerTenantId')
+                        )
+                        if created:
+                            logger.info('Created new customer: %s', customer.tenant_id)
 
-                resource, _ = Resource.objects.get_or_create(
-                    resource_id=row.get('ResourceId'),
-                    defaults={
-                        'name': row.get('productOrderName'),
-                        'resource_group': row.get('resourceGroupName'),
-                        'location': row.get('resourceLocation'),
-                    },
-                )
+                        subscription, created = Subscription.objects.get_or_create(
+                            subscription_id=row.get('SubscriptionId'),
+                            defaults={'name': row.get('subscriptionName'), 'customer': customer},
+                        )
+                        if created:
+                            logger.info('Created new subscription: %s', subscription.subscription_id)
 
-                meter, _ = Meter.objects.get_or_create(
-                    meter_id=row.get('meterId'),
-                    defaults={
-                        'name': row.get('meterName'),
-                        'category': row.get('meterCategory'),
-                        'subcategory': row.get('meterSubCategory'),
-                        'unit': row.get('unitOfMeasure'),
-                    },
-                )
+                        resource, created = Resource.objects.get_or_create(
+                            resource_id=row.get('ResourceId'),
+                            defaults={
+                                'name': row.get('productOrderName'),
+                                'resource_group': row.get('resourceGroupName'),
+                                'location': row.get('resourceLocation'),
+                            },
+                        )
+                        if created:
+                            logger.info('Created new resource: %s', resource.resource_id)
 
-                CostEntry.objects.create(
-                    snapshot=snapshot,
-                    date=row.get('date'),
-                    subscription=subscription,
-                    resource=resource,
-                    meter=meter,
-                    cost_in_usd=row.get('costInUsd') or 0,
-                    cost_in_billing_currency=row.get('costInBillingCurrency') or 0,
-                    billing_currency=row.get('billingCurrency'),
-                    quantity=row.get('quantity') or 0,
-                    unit_price=row.get('unitPrice') or 0,
-                    payg_price=row.get('PayGPrice') or 0,
-                    pricing_model=row.get('pricingModel'),
-                    charge_type=row.get('chargeType'),
-                    tags=row.get('tags') or None,
-                )
-                count += 1
+                        meter, created = Meter.objects.get_or_create(
+                            meter_id=row.get('meterId'),
+                            defaults={
+                                'name': row.get('meterName'),
+                                'category': row.get('meterCategory'),
+                                'subcategory': row.get('meterSubCategory'),
+                                'unit': row.get('unitOfMeasure'),
+                            },
+                        )
+                        if created:
+                            logger.info('Created new meter: %s', meter.meter_id)
 
-        logger.info('Imported %s entries from %s', count, self.file_path)
-        return count
+                        # Parse the date using our helper function
+                        parsed_date = parse_date(row.get('date'))
+                        if not parsed_date:
+                            logger.error('Failed to parse date for row with date: %s', row.get('date'))
+                            continue
+
+                        cost_entry = CostEntry.objects.create(
+                            snapshot=snapshot,
+                            date=parsed_date,
+                            subscription=subscription,
+                            resource=resource,
+                            meter=meter,
+                            cost_in_usd=row.get('costInUsd') or 0,
+                            cost_in_billing_currency=row.get('costInBillingCurrency') or 0,
+                            billing_currency=row.get('billingCurrency'),
+                            quantity=row.get('quantity') or 0,
+                            unit_price=row.get('unitPrice') or 0,
+                            payg_price=row.get('PayGPrice') or 0,
+                            pricing_model=row.get('pricingModel'),
+                            charge_type=row.get('chargeType'),
+                            tags=row.get('tags') or None,
+                        )
+                        logger.debug('Created cost entry: %s', cost_entry.id)
+                        count += 1
+                    except Exception as e:
+                        logger.error('Error processing row: %s. Row data: %s', e, {k: v for k, v in row.items() if k in ['date', 'costInUsd', 'SubscriptionId', 'ResourceId']})
+                        continue
+
+            logger.info('Imported %s entries from %s', count, self.file_path)
+            return count
+        except Exception as e:
+            logger.error('Import failed: %s', e)
+            raise
