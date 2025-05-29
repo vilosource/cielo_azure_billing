@@ -58,6 +58,18 @@ class CostEntryAdmin(admin.ModelAdmin):
         'pricing_model',
         'publisher_name',
         'cost_center',
+        'tags',
     )
-    search_fields = ('subscription__name', 'resource__name')
+    search_fields = (
+        'subscription__name',
+        'resource__name',
+        'resource__resource_group',
+        'resource__location',
+        'meter__category',
+        'meter__subcategory',
+        'meter__service_family',
+        'publisher_name',
+        'cost_center',
+        'tags',
+    )
     readonly_fields = ('snapshot',)
