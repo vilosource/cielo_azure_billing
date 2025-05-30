@@ -8,10 +8,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         updated = 0
         for resource in Resource.objects.all():
-            if not resource.resource_name:
-                resource.resource_name = resource.resource_id.rstrip('/')\
+            print(f'Processing resource: {resource.resource_id}')
+            if not resource.resource_group
+                resource.resource_group = resource.resource_group.rstrip('/')\
                     .split('/')[-1]
-                resource.save(update_fields=['resource_name'])
+                print(f'Updating resource_name for {resource.resource_id} to {resource.resource_group}')
+                #resource.save(update_fields=['resource_name'])
                 updated += 1
 
         self.stdout.write(self.style.SUCCESS(f'Backfilled {updated} resources'))
