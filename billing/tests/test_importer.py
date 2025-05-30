@@ -2,7 +2,7 @@ import json
 import datetime
 from django.test import TestCase
 from billing.services import CostCsvImporter
-from billing.models import CostReportSnapshot, Subscription, CostEntry
+from billing.models import CostReportSnapshot, Subscription, CostEntry, Resource
 
 class CostCsvImporterTests(TestCase):
     def _write_csv(self, path, rows):
@@ -186,4 +186,31 @@ class CostCsvImporterTests(TestCase):
             snap.save(update_fields=['status'])
 
             self.assertEqual(CostReportSnapshot.objects.for_day(datetime.date(2024,1,1)).count(), 0)
+
+    def test_resource_name_extracted(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = f"{tmp}/cost.csv"
+            self._write_csv(csv_path, [{
+                'customerTenantId': 't1',
+                'SubscriptionId': 'sub1',
+                'subscriptionName': 'Sub One',
+                'ResourceId': '/some/path/res1',
+                'productOrderName': 'prod',
+                'resourceGroupName': 'rg',
+                'resourceLocation': 'loc',
+                'meterId': 'm1',
+                'meterName': 'Meter',
+                'meterCategory': 'cat',
+                'meterSubCategory': 'sub',
+                'serviceFamily': 'fam',
+                'unitOfMeasure': 'u',
+                'date': '01/01/2024',
+                'costInUsd': '1'
+            }])
+            importer = CostCsvImporter(csv_path, run_id='run1', report_date=datetime.date(2024,1,1))
+            importer.import_file()
+
+            resource = Resource.objects.get(resource_id='/some/path/res1')
+            self.assertEqual(resource.resource_name, 'res1')
 
