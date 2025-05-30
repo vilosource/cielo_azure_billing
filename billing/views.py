@@ -20,6 +20,24 @@ from .utils import get_latest_snapshot_for_date, get_latest_snapshots
 from caching import get_cache_backend
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
+# Shared filter parameter docs for cost summary endpoints
+SUMMARY_FILTER_PARAMETERS = [
+    OpenApiParameter(name="date", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="subscription_id", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="resource_group", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="location", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="meter_category", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="meter_subcategory", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="pricing_model", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="publisher_name", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="resource_name", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="min_cost", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="max_cost", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="source_id", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="tag_key", location=OpenApiParameter.QUERY, required=False, type=str),
+    OpenApiParameter(name="tag_value", location=OpenApiParameter.QUERY, required=False, type=str),
+]
+
 
 class CostReportSnapshotViewSet(viewsets.ModelViewSet):
     queryset = CostReportSnapshot.objects.all()
@@ -130,7 +148,12 @@ class BaseSummaryView(APIView):
         key = f"{request.path}|{date}|{params}"
         return key
 
+    def get_filter_data(self, request):
+        """Return query parameters for filterset initialization."""
+        return request.GET
+
     def get(self, request):
+        """Resolve latest snapshots, apply filters and aggregate grouped data."""
         cache = get_cache_backend()
         date_str = request.GET.get('date')
         date = None
@@ -152,7 +175,8 @@ class BaseSummaryView(APIView):
         if date:
             queryset = queryset.filter(date=date)
 
-        filterset = self.filterset_class(request.GET, queryset=queryset)
+        filter_data = self.get_filter_data(request)
+        filterset = self.filterset_class(filter_data, queryset=queryset)
         queryset = filterset.qs
 
         # Use temporary annotation names to avoid conflicts with model fields
@@ -184,6 +208,7 @@ class BaseSummaryView(APIView):
         return Response(response_data)
 
 
+@extend_schema(parameters=SUMMARY_FILTER_PARAMETERS)
 class SubscriptionSummaryView(BaseSummaryView):
     group_by = {
         'subscription_id': F('subscription__subscription_id'),
@@ -191,28 +216,29 @@ class SubscriptionSummaryView(BaseSummaryView):
     }
 
 
+@extend_schema(parameters=SUMMARY_FILTER_PARAMETERS)
 class VirtualMachineSummaryView(SubscriptionSummaryView):
-    def get(self, request):
-        # Inject meter category filter
-        request.GET._mutable = True
-        if 'meter_category' not in request.GET:
-            request.GET['meter_category'] = 'Virtual Machines'
-        request.GET._mutable = False
-        return super().get(request)
+    def get_filter_data(self, request):
+        data = request.GET.copy()
+        data.setdefault('meter_category', 'Virtual Machines')
+        return data
 
 
+@extend_schema(parameters=SUMMARY_FILTER_PARAMETERS)
 class ResourceGroupSummaryView(BaseSummaryView):
     group_by = {
         'resource_group': F('resource__resource_group'),
     }
 
 
+@extend_schema(parameters=SUMMARY_FILTER_PARAMETERS)
 class MeterCategorySummaryView(BaseSummaryView):
     group_by = {
         'meter_category': F('meter__category'),
     }
 
 
+@extend_schema(parameters=SUMMARY_FILTER_PARAMETERS)
 class RegionSummaryView(BaseSummaryView):
     group_by = {
         'location': F('resource__location'),
