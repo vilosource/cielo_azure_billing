@@ -308,3 +308,62 @@ class SnapshotReportDatesView(APIView):
         )
         return Response({'available_report_dates': [d.isoformat() for d in dates]})
 
+
+class ResourceGroupTotalsView(APIView):
+    """Return total cost per resource within a resource group."""
+    permission_classes = [PublicEndpointPermission]
+    filterset_class = CostSummaryFilter
+
+    def get_cache_key(self, request, date):
+        params = sorted(request.GET.items())
+        rg = request.GET.get('resource_group', '')
+        return f"resource-group-totals|{rg}|{date}|{params}"
+
+    def get(self, request):
+        resource_group = request.GET.get('resource_group')
+        if not resource_group:
+            return Response({'detail': 'resource_group parameter required'}, status=400)
+
+        date_str = request.GET.get('date')
+        date = None
+        if date_str:
+            try:
+                date = datetime.date.fromisoformat(date_str)
+            except ValueError:
+                return Response({'detail': 'invalid date'}, status=400)
+
+        cache = get_cache_backend()
+        cache_key = self.get_cache_key(request, date_str)
+        cached = cache.get(cache_key)
+        if cached:
+            return Response(cached)
+
+        snapshots, _ = get_latest_snapshots(date)
+        snapshot_ids = [s.id for s in snapshots]
+
+        queryset = CostEntry.objects.filter(
+            snapshot_id__in=snapshot_ids,
+            resource__resource_group=resource_group,
+        )
+        if date:
+            queryset = queryset.filter(date=date)
+
+        filterset = self.filterset_class(request.GET, queryset=queryset)
+        queryset = filterset.qs
+
+        data = list(
+            queryset
+            .values('resource__resource_id', 'resource__resource_name')
+            .annotate(total_usd=Sum('cost_in_usd'))
+            .order_by('-total_usd')
+        )
+
+        response_data = {
+            'resource_group': resource_group,
+            'date': date.isoformat() if date else None,
+            'total_resources': len(data),
+            'data': data,
+        }
+        cache.set(cache_key, response_data, timeout=900)
+        return Response(response_data)
+
