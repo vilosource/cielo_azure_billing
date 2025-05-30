@@ -41,6 +41,9 @@ To discover which billing dates are present, call
 `/api/costs/available-report-dates/?month=YYYY-MM` (defaults to the current
 month).
 
+To list the snapshot report dates that can be queried for summaries, use
+`/api/snapshots/available-report-dates/`.
+
 ## API Filtering
 
 Cost entry and cost summary endpoints share a common set of query parameters.  
