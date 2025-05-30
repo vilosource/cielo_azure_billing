@@ -56,6 +56,9 @@ class CostCsvImporter:
                         )
                         if created:
                             logger.info('Created new subscription: %s', subscription.subscription_id)
+                        elif row.get('subscriptionName') and subscription.name != row.get('subscriptionName'):
+                            subscription.name = row.get('subscriptionName')
+                            subscription.save(update_fields=['name'])
 
                         resource, created = Resource.objects.get_or_create(
                             resource_id=row.get('ResourceId'),

@@ -24,9 +24,11 @@ class ImportSnapshotAdmin(admin.ModelAdmin):
 
 @admin.register(BillingBlobSource)
 class BillingBlobSourceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'subscription', 'guid', 'is_active', 'status')
-    list_filter = ('subscription', 'is_active')
+    list_display = ('name', 'guid', 'is_active', 'status')
+    list_filter = ('is_active',)
     search_fields = ('name', 'guid')
+    readonly_fields = ('last_imported_at', 'last_attempted_at', 'status', 'is_active')
+    fields = ('name', 'path_template', 'guid')
 
 
 @admin.register(Customer)

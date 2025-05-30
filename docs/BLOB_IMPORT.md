@@ -2,16 +2,15 @@
 
 This project supports automated fetching of Azure cost export files directly from
 Azure Blob Storage. Sources are defined with the `BillingBlobSource` model which
-stores the path template, subscription and metadata about each import attempt.
+stores the path template and metadata about each import attempt.
 
 ## Models
 
 ### BillingBlobSource
-- `subscription` – related subscription
 - `name` – friendly identifier used by CLI options
-- `path_template` – format string with `{billing_period}` and `{guid}`
-- `guid` – export GUID from Azure
-- `is_active` – enable/disable the source
+    - `path_template` – format string with `{billing_period}` and `{guid}`
+    - `guid` – export GUID from Azure
+    - `is_active` – enable/disable the source
 - timestamps for last attempt and import plus a `status` field
 
 ### ImportSnapshot
