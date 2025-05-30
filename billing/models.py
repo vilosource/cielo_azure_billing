@@ -5,10 +5,10 @@ class BillingBlobSource(models.Model):
     """Configuration for locating cost export blobs."""
 
     name = models.CharField(max_length=100)
-    path_template = models.TextField(
-        help_text="Use placeholders {billing_period} and {guid} in the template"
+    base_folder = models.CharField(
+        max_length=255,
+        help_text="Base export folder e.g. costreports/prod/prod-actual-cost/",
     )
-    guid = models.CharField(max_length=64)
     is_active = models.BooleanField(default=True)
     last_imported_at = models.DateTimeField(null=True, blank=True)
     last_attempted_at = models.DateTimeField(null=True, blank=True)
@@ -101,11 +101,15 @@ class CostEntry(models.Model):
     resource = models.ForeignKey(Resource, on_delete=models.CASCADE)
     meter = models.ForeignKey(Meter, on_delete=models.CASCADE)
     cost_in_usd = models.DecimalField(max_digits=12, decimal_places=4)
-    cost_in_billing_currency = models.DecimalField(max_digits=12, decimal_places=4, null=True, blank=True)
+    cost_in_billing_currency = models.DecimalField(
+        max_digits=12, decimal_places=4, null=True, blank=True
+    )
     billing_currency = models.CharField(max_length=10, null=True, blank=True)
     quantity = models.DecimalField(max_digits=12, decimal_places=4)
     unit_price = models.DecimalField(max_digits=12, decimal_places=6)
-    payg_price = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True)
+    payg_price = models.DecimalField(
+        max_digits=12, decimal_places=6, null=True, blank=True
+    )
     pricing_model = models.CharField(max_length=64, null=True, blank=True)
     charge_type = models.CharField(max_length=64, null=True, blank=True)
     publisher_name = models.CharField(max_length=255, null=True, blank=True)
@@ -113,15 +117,15 @@ class CostEntry(models.Model):
     tags = models.JSONField(null=True, blank=True)
 
     def __str__(self):
-        return f'{self.date} - {self.subscription}'
+        return f"{self.date} - {self.subscription}"
 
     class Meta:
         unique_together = (
-            'snapshot',
-            'date',
-            'subscription',
-            'resource',
-            'meter',
-            'quantity',
-            'unit_price',
+            "snapshot",
+            "date",
+            "subscription",
+            "resource",
+            "meter",
+            "quantity",
+            "unit_price",
         )
