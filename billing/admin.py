@@ -50,8 +50,8 @@ class SubscriptionAdmin(admin.ModelAdmin):
 
 @admin.register(Resource)
 class ResourceAdmin(admin.ModelAdmin):
-    list_display = ("resource_id", "name", "resource_group", "location")
-    search_fields = ("resource_id", "name", "resource_group", "location")
+    list_display = ("resource_id", "name", "resource_name", "resource_group", "location")
+    search_fields = ("resource_id", "name", "resource_group", "location", "resource_name")
 
 
 @admin.register(Meter)
@@ -93,7 +93,6 @@ class CostEntryAdmin(admin.ModelAdmin):
         "pricing_model",
         "publisher_name",
         "cost_center",
-        "tags",
     )
     search_fields = (
         "subscription__name",

@@ -370,7 +370,7 @@ class Resource(models.Model):
     location = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
-        return self.name or self.resource_id
+        return self.resource_name
 
 
 class Meter(models.Model):
