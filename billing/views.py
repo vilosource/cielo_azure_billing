@@ -40,37 +40,49 @@ SUMMARY_FILTER_PARAMETERS = [
 ]
 
 
+@extend_schema(
+    description="Create and inspect snapshot records for imported Azure cost reports.")
 class CostReportSnapshotViewSet(viewsets.ModelViewSet):
+    """CRUD interface for :class:`CostReportSnapshot` objects."""
     queryset = CostReportSnapshot.objects.all()
     serializer_class = CostReportSnapshotSerializer
     permission_classes = [PublicEndpointPermission]
 
 
+@extend_schema(description="Manage Azure customers that own subscriptions.")
 class CustomerViewSet(viewsets.ModelViewSet):
+    """API endpoint for managing :class:`Customer` objects."""
     queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
     permission_classes = [PublicEndpointPermission]
 
 
+@extend_schema(description="Manage Azure subscriptions that incur costs.")
 class SubscriptionViewSet(viewsets.ModelViewSet):
+    """API endpoint for :class:`Subscription` data."""
     queryset = Subscription.objects.all()
     serializer_class = SubscriptionSerializer
     permission_classes = [PublicEndpointPermission]
 
 
+@extend_schema(description="Query and update Azure resources referenced in cost reports.")
 class ResourceViewSet(viewsets.ModelViewSet):
+    """CRUD operations for :class:`Resource` models."""
     queryset = Resource.objects.all()
     serializer_class = ResourceSerializer
     permission_classes = [PublicEndpointPermission]
 
 
+@extend_schema(description="Lookup Azure meter metadata used for billing entries.")
 class MeterViewSet(viewsets.ModelViewSet):
+    """API endpoint for :class:`Meter` objects."""
     queryset = Meter.objects.all()
     serializer_class = MeterSerializer
     permission_classes = [PublicEndpointPermission]
 
 
 @extend_schema(
+    description="Detailed billing line items from imported cost reports.",
     parameters=[
         OpenApiParameter(name="resourceGroupName", location=OpenApiParameter.QUERY, required=False, type=str),
         OpenApiParameter(name="subscriptionName", location=OpenApiParameter.QUERY, required=False, type=str),
@@ -86,6 +98,7 @@ class MeterViewSet(viewsets.ModelViewSet):
     ]
 )
 class CostEntryViewSet(viewsets.ModelViewSet):
+    """CRUD and aggregated access to individual billing entries."""
     queryset = CostEntry.objects.all()
     serializer_class = CostEntrySerializer
     permission_classes = [PublicEndpointPermission]
@@ -140,6 +153,7 @@ class CostEntryViewSet(viewsets.ModelViewSet):
 
 
 class BaseSummaryView(APIView):
+    """Base class for cost summary endpoints aggregating `CostEntry` data."""
     permission_classes = [PublicEndpointPermission]
     filterset_class = CostSummaryFilter
     group_by = None  # tuple of (queryset field expressions, response keys)
@@ -209,43 +223,64 @@ class BaseSummaryView(APIView):
         return Response(response_data)
 
 
-@extend_schema(parameters=SUMMARY_FILTER_PARAMETERS)
+@extend_schema(
+    description="Summarize costs by subscription.",
+    parameters=SUMMARY_FILTER_PARAMETERS,
+)
 class SubscriptionSummaryView(BaseSummaryView):
+    """Return aggregated cost data grouped by subscription."""
     group_by = {
         'subscription_id': F('subscription__subscription_id'),
         'subscription_name': F('subscription__name'),
     }
 
 
-@extend_schema(parameters=SUMMARY_FILTER_PARAMETERS)
+@extend_schema(
+    description="Summarize virtual machine costs across subscriptions.",
+    parameters=SUMMARY_FILTER_PARAMETERS,
+)
 class VirtualMachineSummaryView(SubscriptionSummaryView):
+    """Summary of virtual machine spend for each subscription."""
     def get_filter_data(self, request):
         data = request.GET.copy()
         data.setdefault('meter_category', 'Virtual Machines')
         return data
 
 
-@extend_schema(parameters=SUMMARY_FILTER_PARAMETERS)
+@extend_schema(
+    description="Summarize costs aggregated by resource group.",
+    parameters=SUMMARY_FILTER_PARAMETERS,
+)
 class ResourceGroupSummaryView(BaseSummaryView):
+    """Aggregate costs by resource group across all subscriptions."""
     group_by = {
         'resource_group': F('resource__resource_group'),
     }
 
 
-@extend_schema(parameters=SUMMARY_FILTER_PARAMETERS)
+@extend_schema(
+    description="Summarize costs by meter category, such as compute or storage.",
+    parameters=SUMMARY_FILTER_PARAMETERS,
+)
 class MeterCategorySummaryView(BaseSummaryView):
+    """Summaries grouped by top level meter category."""
     group_by = {
         'meter_category': F('meter__category'),
     }
 
 
-@extend_schema(parameters=SUMMARY_FILTER_PARAMETERS)
+@extend_schema(
+    description="Summarize costs by Azure region.",
+    parameters=SUMMARY_FILTER_PARAMETERS,
+)
 class RegionSummaryView(BaseSummaryView):
+    """Summaries grouped by Azure geographic region."""
     group_by = {
         'location': F('resource__location'),
     }
 
 
+@extend_schema(description="List billing dates available for a given month.")
 class AvailableReportDatesView(APIView):
     """Return distinct billing dates available within a month."""
     permission_classes = [PublicEndpointPermission]
@@ -294,8 +329,9 @@ class AvailableReportDatesView(APIView):
             }
         )
 
+@extend_schema(description="List snapshot report dates available for summaries.")
 class SnapshotReportDatesView(APIView):
-    """Return distinct report_date values from completed snapshots."""
+    """Return distinct ``report_date`` values from completed snapshots."""
     permission_classes = [PublicEndpointPermission]
 
     def get(self, request):
@@ -309,6 +345,7 @@ class SnapshotReportDatesView(APIView):
         return Response({'available_report_dates': [d.isoformat() for d in dates]})
 
 
+@extend_schema(description="Total cost per resource for a specified resource group.")
 class ResourceGroupTotalsView(APIView):
     """Return total cost per resource within a resource group."""
     permission_classes = [PublicEndpointPermission]
