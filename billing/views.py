@@ -293,3 +293,18 @@ class AvailableReportDatesView(APIView):
                 'available_dates': [d.isoformat() for d in dates],
             }
         )
+
+class SnapshotReportDatesView(APIView):
+    """Return distinct report_date values from completed snapshots."""
+    permission_classes = [PublicEndpointPermission]
+
+    def get(self, request):
+        dates = (
+            CostReportSnapshot.objects.filter(status=CostReportSnapshot.Status.COMPLETE)
+            .exclude(report_date__isnull=True)
+            .values_list('report_date', flat=True)
+            .distinct()
+            .order_by('report_date')
+        )
+        return Response({'available_report_dates': [d.isoformat() for d in dates]})
+
