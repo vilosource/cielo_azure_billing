@@ -201,7 +201,10 @@ class BaseSummaryView(APIView):
             queryset
             .annotate(**annotated_fields)
             .values(*annotated_fields.keys())
-            .annotate(total_usd=Sum('cost_in_usd'))
+            .annotate(
+                total_usd=Sum('cost_in_usd'),
+                total_billing=Sum('cost_in_billing_currency'),
+            )
             .order_by()
         )
 
@@ -391,7 +394,10 @@ class ResourceGroupTotalsView(APIView):
         data = list(
             queryset
             .values('resource__resource_id', 'resource__resource_name')
-            .annotate(total_usd=Sum('cost_in_usd'))
+            .annotate(
+                total_usd=Sum('cost_in_usd'),
+                total_billing=Sum('cost_in_billing_currency'),
+            )
             .order_by('-total_usd')
         )
 

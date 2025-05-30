@@ -74,7 +74,7 @@ All summary endpoints inherit from `BaseSummaryView` located in `billing/views.p
 1. Resolve the latest completed `CostReportSnapshot` for each active `BillingBlobSource` using `get_latest_snapshots()`.
 2. Filter `CostEntry` rows to include only those snapshots (and the requested billing date if provided).
 3. Apply additional filters based on the query parameters.
-4. Group the remaining entries by the configured fields and sum `cost_in_usd`.
+4. Group the remaining entries by the configured fields and sum `cost_in_usd` and `cost_in_billing_currency`.
 5. Cache the result for subsequent requests.
 
 The relevant implementation is shown below:
@@ -96,7 +96,10 @@ class BaseSummaryView(APIView):
             filterset.qs
             .annotate(**{f"_{k}": v for k, v in self.group_by.items()})
             .values(*[f"_{k}" for k in self.group_by])
-            .annotate(total_usd=Sum('cost_in_usd'))
+            .annotate(
+                total_usd=Sum('cost_in_usd'),
+                total_billing=Sum('cost_in_billing_currency'),
+            )
             .order_by()
         )
 ```
