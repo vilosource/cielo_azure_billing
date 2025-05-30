@@ -1,4 +1,20 @@
 from django.db import models
+import datetime
+import json
+import logging
+import tempfile
+from pathlib import Path
+from urllib.parse import urlparse
+
+try:
+    from azure.identity import DefaultAzureCredential
+    from azure.storage.blob import BlobClient, ContainerClient
+except Exception:  # pragma: no cover - libs optional for offline env
+    DefaultAzureCredential = None
+    BlobClient = None
+    ContainerClient = None
+
+logger = logging.getLogger(__name__)
 
 
 class BillingBlobSource(models.Model):
@@ -19,6 +35,262 @@ class BillingBlobSource(models.Model):
 
     def __str__(self):
         return self.name
+
+    @staticmethod
+    def parse_base_folder(base):
+        """Parse base folder URL into container URL and prefix."""
+        logger.debug(f"Parsing base folder: {base}")
+        parsed = urlparse(base)
+        logger.debug(f"Parsed URL - scheme: {parsed.scheme}, netloc: {parsed.netloc}, path: {parsed.path}")
+
+        path = parsed.path.lstrip("/")
+        parts = path.split("/", 1)
+        container = parts[0]
+        prefix = ""
+        if len(parts) > 1:
+            prefix = parts[1].rstrip("/") + "/"
+        container_url = f"{parsed.scheme}://{parsed.netloc}/{container}"
+
+        logger.debug(f"Extracted container: {container}, prefix: {prefix}, container_url: {container_url}")
+        return container_url, prefix
+
+    def get_azure_client(self):
+        """Get Azure container client for this blob source."""
+        if DefaultAzureCredential is None:
+            raise RuntimeError("Azure SDK not installed")
+
+        cred = DefaultAzureCredential()
+        container_url, prefix = self.parse_base_folder(self.base_folder)
+        client = ContainerClient.from_container_url(container_url, credential=cred)
+        return client, container_url, prefix
+
+    def list_blobs(self, billing_period=None):
+        """List all blobs for this source, optionally filtered by billing period."""
+        client, container_url, prefix = self.get_azure_client()
+
+        listing_prefix = prefix
+        if billing_period:
+            listing_prefix = f"{prefix}{billing_period}/"
+
+        logger.info(f"Listing blobs with prefix: {listing_prefix}")
+        blobs = client.list_blobs(name_starts_with=listing_prefix)
+        blob_list = list(blobs)
+
+        logger.info(f"Found {len(blob_list)} blobs in container {container_url} with prefix {listing_prefix}")
+
+        # If no blobs found with period-specific prefix, try searching without period
+        if not blob_list and billing_period:
+            logger.info(f"No blobs found with period prefix, trying base prefix: {prefix}")
+            blobs = client.list_blobs(name_starts_with=prefix)
+            blob_list = list(blobs)
+            logger.info(f"Found {len(blob_list)} blobs in container {container_url} with base prefix {prefix}")
+
+        return blob_list, container_url
+
+    def get_manifests(self, billing_period=None):
+        """Get all manifest files for this source."""
+        blob_list, container_url = self.list_blobs(billing_period)
+        manifests = [b for b in blob_list if b.name.endswith("manifest.json")]
+        logger.info(f"Found {len(blob_list)} total blobs, {len(manifests)} manifests")
+        return manifests, container_url
+
+    def get_manifest_data(self, manifest_blob, container_url):
+        """Download and parse manifest data."""
+        manifest_url = f"{container_url}/{manifest_blob.name}"
+        logger.debug(f"Downloading manifest from: {manifest_url}")
+
+        cred = DefaultAzureCredential()
+        bclient = BlobClient.from_blob_url(manifest_url, credential=cred)
+        manifest_data = json.loads(bclient.download_blob().readall())
+
+        run_info = manifest_data.get("runInfo", {})
+        run_id = run_info.get("runId")
+        report_date_raw = run_info.get("endDate")
+
+        logger.debug(f"Extracted run_id: {run_id}, end_date: {report_date_raw}")
+
+        report_date = None
+        if report_date_raw:
+            report_date = datetime.date.fromisoformat(
+                report_date_raw.split("T")[0]
+            )
+
+        return {
+            'manifest_data': manifest_data,
+            'run_id': run_id,
+            'report_date': report_date
+        }
+
+    def download_csv_blob(self, manifest_data, container_url):
+        """Download CSV blob from manifest data."""
+        blob_name = manifest_data.get("blobs", [{}])[0].get("blobName")
+        if not blob_name:
+            raise RuntimeError("No blobName in manifest")
+
+        csv_url = f"{container_url}/{blob_name}"
+        logger.debug(f"Downloading CSV from: {csv_url}")
+
+        cred = DefaultAzureCredential()
+        bclient = BlobClient.from_blob_url(csv_url, credential=cred)
+        csv_blob_data = bclient.download_blob().readall()
+
+        return csv_blob_data, blob_name
+
+    def process_import_run(self, manifest_blob, container_url, dry_run=False, overwrite=False):
+        """Process a single import run from a manifest blob."""
+        from billing.services import CostCsvImporter
+        
+        # Get manifest data
+        manifest_info = self.get_manifest_data(manifest_blob, container_url)
+        manifest_data = manifest_info['manifest_data']
+        run_id = manifest_info['run_id']
+        report_date = manifest_info['report_date']
+        
+        # Check if already imported - use string reference to avoid circular import
+        from django.apps import apps
+        CostReportSnapshot = apps.get_model('billing', 'CostReportSnapshot')
+        if CostReportSnapshot.objects.filter(run_id=run_id).exists() and not overwrite:
+            logger.info("Skip existing run %s for %s", run_id, self.name)
+            return {'status': 'skipped', 'run_id': run_id, 'reason': 'already_exists'}
+
+        # Download CSV data
+        csv_blob_data, blob_name = self.download_csv_blob(manifest_data, container_url)
+        download_size = len(csv_blob_data)
+        logger.debug(f"Downloaded {download_size} bytes")
+
+        # Save to temporary files
+        tmp_dir = Path(tempfile.mkdtemp())
+        gz_path = tmp_dir / Path(blob_name).name
+        manifest_path = tmp_dir / "manifest.json"
+
+        logger.debug(f"Saving files to temporary directory: {tmp_dir}")
+
+        with open(gz_path, "wb") as fh:
+            fh.write(csv_blob_data)
+        with open(manifest_path, "w", encoding="utf-8") as fh:
+            json.dump(manifest_data, fh)
+
+        # Decompress if needed
+        import gzip
+        csv_path = tmp_dir / (gz_path.stem)
+        logger.debug(f"Decompressing {gz_path} to {csv_path}")
+
+        with gzip.open(gz_path, "rb") as f_in, open(csv_path, "wb") as f_out:
+            f_out.write(f_in.read())
+
+        if dry_run:
+            self.status = "dry-run"
+            logger.info("Dry run completed for %s. Files stored at %s", self.name, tmp_dir)
+            return {
+                'status': 'dry_run',
+                'run_id': run_id,
+                'tmp_dir': str(tmp_dir),
+                'download_size': download_size
+            }
+        else:
+            logger.info(f"Starting import for run_id: {run_id}")
+
+            importer = CostCsvImporter(
+                str(csv_path),
+                run_id=run_id,
+                report_date=report_date,
+                source=self,
+            )
+            importer.import_file()
+
+            self.last_imported_at = datetime.datetime.now(datetime.timezone.utc)
+            self.status = "imported"
+
+            logger.info(f"Successfully imported run_id: {run_id}")
+            return {
+                'status': 'imported',
+                'run_id': run_id,
+                'download_size': download_size
+            }
+
+    def fetch_and_import(self, billing_period=None, dry_run=False, overwrite=False):
+        """Fetch and import all available runs for this source."""
+        self.last_attempted_at = datetime.datetime.now(datetime.timezone.utc)
+
+        try:
+            manifests, container_url = self.get_manifests(billing_period)
+
+            if not manifests:
+                self.status = "no-manifests"
+                self.save(update_fields=["last_attempted_at", "status"])
+                return {'status': 'no_manifests', 'manifests_found': 0, 'runs_processed': []}
+
+            runs_processed = []
+            for manifest_blob in manifests:
+                result = self.process_import_run(manifest_blob, container_url, dry_run, overwrite)
+                runs_processed.append(result)
+
+            if not dry_run:
+                self.save(update_fields=["last_attempted_at", "last_imported_at", "status"])
+
+            return {
+                'status': 'success',
+                'manifests_found': len(manifests),
+                'runs_processed': runs_processed
+            }
+
+        except Exception as exc:
+            self.status = f"error: {exc}"
+            self.save(update_fields=["last_attempted_at", "status"])
+            raise
+
+    def inspect_available_runs(self, billing_period=None):
+        """Inspect available export runs without importing."""
+        blob_list, container_url = self.list_blobs(billing_period)
+        
+        manifests = [b for b in blob_list if b.name.endswith("manifest.json")]
+        csv_files = [b for b in blob_list if b.name.endswith((".csv", ".csv.gz"))]
+        other_files = [b for b in blob_list if not b.name.endswith("manifest.json") and not b.name.endswith((".csv", ".csv.gz"))]
+        
+        runs_data = []
+        for manifest_blob in manifests:
+            manifest_info = self.get_manifest_data(manifest_blob, container_url)
+            run_id = manifest_info['run_id']
+            
+            # Use string reference to avoid circular import
+            from django.apps import apps
+            CostReportSnapshot = apps.get_model('billing', 'CostReportSnapshot')
+            imported = CostReportSnapshot.objects.filter(run_id=run_id).exists()
+
+            run_data = {
+                'run_id': run_id,
+                'end_date': manifest_info['report_date'],
+                'size': manifest_blob.size,
+                'imported': imported,
+                'blob_name': manifest_blob.name,
+                'last_modified': manifest_blob.last_modified
+            }
+            runs_data.append(run_data)
+
+        return {
+            'total_blobs': len(blob_list),
+            'manifests': len(manifests),
+            'csv_files': len(csv_files),
+            'other_files': len(other_files),
+            'runs_data': runs_data,
+            'blob_details': {
+                'manifests': manifests,
+                'csv_files': csv_files,
+                'other_files': other_files
+            }
+        }
+
+    @staticmethod
+    def format_bytes(size_bytes):
+        """Convert bytes to human readable format."""
+        if size_bytes == 0:
+            return "0 B"
+
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size_bytes < 1024.0:
+                return f"{size_bytes:.1f} {unit}"
+            size_bytes /= 1024.0
+        return f"{size_bytes:.1f} PB"
 
 
 class CostReportSnapshotQuerySet(models.QuerySet):
