@@ -1,11 +1,32 @@
 from django.contrib import admin
-from .models import ImportSnapshot, Customer, Subscription, Resource, Meter, CostEntry
+from .models import (
+    BillingBlobSource,
+    ImportSnapshot,
+    Customer,
+    Subscription,
+    Resource,
+    Meter,
+    CostEntry,
+)
 
 
 @admin.register(ImportSnapshot)
 class ImportSnapshotAdmin(admin.ModelAdmin):
-    list_display = ('file_name', 'snapshot_date', 'created_at')
+    list_display = (
+        'file_name',
+        'run_id',
+        'report_date',
+        'created_at',
+        'source',
+    )
     search_fields = ('file_name',)
+
+
+@admin.register(BillingBlobSource)
+class BillingBlobSourceAdmin(admin.ModelAdmin):
+    list_display = ('name', 'subscription', 'guid', 'is_active', 'status')
+    list_filter = ('subscription', 'is_active')
+    search_fields = ('name', 'guid')
 
 
 @admin.register(Customer)

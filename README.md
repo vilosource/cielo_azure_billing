@@ -54,3 +54,5 @@ Cost entry endpoints accept the following query parameters:
 Additional details are available in [`docs/SPEC.md`](docs/SPEC.md). Guidance for
 adding new management commands can be found in
 [`docs/DJANGO_COMMANDS.md`](docs/DJANGO_COMMANDS.md).
+Information on the automated blob import system lives in
+[`docs/BLOB_IMPORT.md`](docs/BLOB_IMPORT.md).

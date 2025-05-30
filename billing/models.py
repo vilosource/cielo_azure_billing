@@ -1,13 +1,59 @@
 from django.db import models
 
 
-class ImportSnapshot(models.Model):
-    snapshot_date = models.DateField(auto_now_add=True, db_index=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    file_name = models.CharField(max_length=255)
+class BillingBlobSource(models.Model):
+    """Configuration for locating cost export blobs."""
+
+    subscription = models.ForeignKey("Subscription", on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    path_template = models.TextField(
+        help_text="Use placeholders {billing_period} and {guid} in the template"
+    )
+    guid = models.CharField(max_length=64)
+    is_active = models.BooleanField(default=True)
+    last_imported_at = models.DateTimeField(null=True, blank=True)
+    last_attempted_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(max_length=64, null=True, blank=True)
+
+    class Meta:
+        unique_together = ("subscription", "guid")
 
     def __str__(self):
-        return f'{self.file_name} @ {self.snapshot_date}'
+        return f"{self.name} ({self.subscription})"
+
+
+class ImportSnapshotQuerySet(models.QuerySet):
+    def latest_per_subscription(self):
+        from django.db.models import Max
+
+        latest = self.values("source__subscription_id").annotate(
+            latest_id=Max("id")
+        )
+        return self.filter(id__in=[item["latest_id"] for item in latest])
+
+    def latest_overall(self):
+        return self.order_by("-created_at").first()
+
+    def for_day(self, target_date):
+        return self.filter(report_date=target_date)
+
+
+class ImportSnapshot(models.Model):
+    run_id = models.CharField(max_length=64, unique=True, db_index=True)
+    report_date = models.DateField(null=True, blank=True)
+    file_name = models.CharField(max_length=255)
+    source = models.ForeignKey(
+        "BillingBlobSource", null=True, on_delete=models.SET_NULL
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = ImportSnapshotQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.file_name} @ {self.report_date or self.created_at.date()}"
 
 
 class Customer(models.Model):
