@@ -6,7 +6,7 @@ All cost related API endpoints accept the same set of query parameters. These pa
 |-----------|-------------|
 | `date` | Billing date. When omitted, the API uses the latest available data. |
 | `subscription_id` | Filter by subscription ID. |
-| `resource_group` | Filter by Azure resource group. |
+| `resource_group` | Filter by Azure resource group. Names are stored in lowercase. |
 | `location` | Azure region of the resource. |
 | `meter_category` | High level service category such as `Virtual Machines` or `Storage`. |
 | `meter_subcategory` | Optional sub category like `Premium SSD`. |

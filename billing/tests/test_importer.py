@@ -214,3 +214,30 @@ class CostCsvImporterTests(TestCase):
             resource = Resource.objects.get(resource_id='/some/path/res1')
             self.assertEqual(resource.resource_name, 'res1')
 
+    def test_resource_group_normalized(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = f"{tmp}/cost.csv"
+            self._write_csv(csv_path, [{
+                'customerTenantId': 't1',
+                'SubscriptionId': 'sub1',
+                'subscriptionName': 'Sub One',
+                'ResourceId': '/r1',
+                'productOrderName': 'prod',
+                'resourceGroupName': ' MyRG ',
+                'resourceLocation': 'loc',
+                'meterId': 'm1',
+                'meterName': 'Meter',
+                'meterCategory': 'cat',
+                'meterSubCategory': 'sub',
+                'serviceFamily': 'fam',
+                'unitOfMeasure': 'u',
+                'date': '01/01/2024',
+                'costInUsd': '1'
+            }])
+            importer = CostCsvImporter(csv_path, run_id='run1', report_date=datetime.date(2024,1,1))
+            importer.import_file()
+
+            res = Resource.objects.get(resource_id='/r1')
+            self.assertEqual(res.resource_group, 'myrg')
+
