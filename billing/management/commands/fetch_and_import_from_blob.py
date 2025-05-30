@@ -75,14 +75,18 @@ class Command(BaseCommand):
             blob_client = BlobClient.from_blob_url(csv_url, credential=cred)
             tmp_dir = Path(self.mktemp())
             gz_path = tmp_dir / Path(blob_name).name
+            manifest_path = tmp_dir / "manifest.json"
             with open(gz_path, "wb") as fh:
                 fh.write(blob_client.download_blob().readall())
+            with open(manifest_path, "w", encoding="utf-8") as fh:
+                json.dump(manifest_data, fh)
             import gzip
             csv_path = tmp_dir / (gz_path.stem)
             with gzip.open(gz_path, "rb") as f_in, open(csv_path, "wb") as f_out:
                 f_out.write(f_in.read())
             if dry_run:
                 source.status = "dry-run"
+                logger.info("Dry run completed for %s. Files stored at %s", source.name, tmp_dir)
             else:
                 importer = CostCsvImporter(str(csv_path), run_id=run_id, report_date=report_date, source=source)
                 importer.import_file()

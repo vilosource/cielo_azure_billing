@@ -4,7 +4,6 @@ from django.db import models
 class BillingBlobSource(models.Model):
     """Configuration for locating cost export blobs."""
 
-    subscription = models.ForeignKey("Subscription", on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     path_template = models.TextField(
         help_text="Use placeholders {billing_period} and {guid} in the template"
@@ -16,18 +15,18 @@ class BillingBlobSource(models.Model):
     status = models.CharField(max_length=64, null=True, blank=True)
 
     class Meta:
-        unique_together = ("subscription", "guid")
+        ordering = ["name"]
 
     def __str__(self):
-        return f"{self.name} ({self.subscription})"
+        return self.name
 
 
 class ImportSnapshotQuerySet(models.QuerySet):
     def latest_per_subscription(self):
         from django.db.models import Max
 
-        latest = self.values("source__subscription_id").annotate(
-            latest_id=Max("id")
+        latest = CostEntry.objects.values("subscription_id").annotate(
+            latest_id=Max("snapshot_id")
         )
         return self.filter(id__in=[item["latest_id"] for item in latest])
 
