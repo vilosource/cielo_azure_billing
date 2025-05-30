@@ -39,19 +39,25 @@ snapshot that includes that date.
 
 ## API Filtering
 
-Cost entry endpoints accept the following query parameters:
+Cost entry and cost summary endpoints share a common set of query parameters.  
+These filters make it easy to drill down into specific subscriptions, resources
+or tagged costs.  The main options are:
 
-- `resourceGroupName`
-- `subscriptionName`
-- `meterCategory`
-- `meterSubCategory`
-- `serviceFamily`
-- `resourceLocation`
-- `chargeType`
-- `pricingModel`
-- `publisherName`
-- `costCenter`
-- `tags`
+- `date` – billing date (defaults to the latest available when omitted)
+- `subscription_id` – filter by subscription
+- `resource_group` – filter by resource group
+- `location` – filter by Azure region
+- `meter_category` – e.g. `Virtual Machines`, `Storage`
+- `meter_subcategory` – optional deeper filter such as `Premium SSD`
+- `pricing_model` – pricing model, e.g. `OnDemand`, `Spot`
+- `publisher_name` – filter Azure Marketplace charges
+- `resource_name` – filter by resource name
+- `min_cost` / `max_cost` – filter by cost range
+- `source_id` – filter results from a specific `BillingBlobSource`
+- `tag_key` and `tag_value` – filter by resource tags
+
+Legacy camelCase parameters like `resourceGroupName` are still accepted for
+backwards compatibility on the cost entry endpoint.
 
 ## Documentation
 
@@ -60,3 +66,5 @@ adding new management commands can be found in
 [`docs/DJANGO_COMMANDS.md`](docs/DJANGO_COMMANDS.md).
 Information on the automated blob import system lives in
 [`docs/BLOB_IMPORT.md`](docs/BLOB_IMPORT.md).
+Filtering examples for the API are provided in
+[`docs/CostsFilteringGuide.md`](docs/CostsFilteringGuide.md).

@@ -35,4 +35,12 @@ class SubscriptionSummaryAPITests(TestCase):
         sub_ids = {item['subscription_id'] for item in data}
         self.assertEqual(sub_ids, {'sub1', 'sub2'})
 
+    def test_filter_by_subscription(self):
+        url = '/api/costs/subscription-summary/?date=2024-01-01&subscription_id=sub1'
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()['data']
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['subscription_id'], 'sub1')
+
 
