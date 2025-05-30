@@ -12,6 +12,7 @@ from .views import (
     ResourceGroupSummaryView,
     MeterCategorySummaryView,
     RegionSummaryView,
+    AvailableReportDatesView,
 )
 
 router = DefaultRouter()
@@ -29,4 +30,5 @@ urlpatterns = [
     path('costs/resource-group-summary/', ResourceGroupSummaryView.as_view()),
     path('costs/meter-category-summary/', MeterCategorySummaryView.as_view()),
     path('costs/region-summary/', RegionSummaryView.as_view()),
+    path('costs/available-report-dates/', AvailableReportDatesView.as_view()),
 ]

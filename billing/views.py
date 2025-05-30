@@ -1,4 +1,5 @@
 import datetime
+import calendar
 from rest_framework import viewsets
 from rest_framework.views import APIView
 from rest_framework.decorators import action
@@ -243,3 +244,52 @@ class RegionSummaryView(BaseSummaryView):
     group_by = {
         'location': F('resource__location'),
     }
+
+
+class AvailableReportDatesView(APIView):
+    """Return distinct billing dates available within a month."""
+    permission_classes = [PublicEndpointPermission]
+
+    def get(self, request):
+        month_str = request.GET.get('month')
+        if month_str:
+            try:
+                year, month = [int(part) for part in month_str.split('-')]
+                month_date = datetime.date(year, month, 1)
+            except ValueError:
+                return Response({'detail': 'invalid month'}, status=400)
+        else:
+            today = datetime.date.today()
+            month_date = today.replace(day=1)
+
+        last_day = calendar.monthrange(month_date.year, month_date.month)[1]
+        start_date = month_date
+        end_date = month_date.replace(day=last_day)
+
+        snapshot_ids = []
+        for source in BillingBlobSource.objects.filter(is_active=True):
+            snap = (
+                CostReportSnapshot.objects.filter(
+                    source=source,
+                    status=CostReportSnapshot.Status.COMPLETE,
+                    costentry__date__range=(start_date, end_date),
+                )
+                .order_by('-created_at')
+                .first()
+            )
+            if snap:
+                snapshot_ids.append(snap.id)
+
+        dates = (
+            CostEntry.objects.filter(snapshot_id__in=snapshot_ids, date__range=(start_date, end_date))
+            .values_list('date', flat=True)
+            .distinct()
+            .order_by('date')
+        )
+
+        return Response(
+            {
+                'month': month_date.strftime('%Y-%m'),
+                'available_dates': [d.isoformat() for d in dates],
+            }
+        )

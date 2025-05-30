@@ -37,6 +37,10 @@ When requesting cost entries for a specific billing date via
 `/api/cost-entries/?date=YYYY-MM-DD`, the API returns data from the most recent
 snapshot that includes that date.
 
+To discover which billing dates are present, call
+`/api/costs/available-report-dates/?month=YYYY-MM` (defaults to the current
+month).
+
 ## API Filtering
 
 Cost entry and cost summary endpoints share a common set of query parameters.  
