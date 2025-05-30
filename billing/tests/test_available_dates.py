@@ -13,7 +13,7 @@ class AvailableReportDatesTests(TestCase):
 
         # older snapshot for source1
         snap_old = CostReportSnapshot.objects.create(run_id='old', report_date=datetime.date(2024,1,2), file_name='f1', source=self.source1, status=CostReportSnapshot.Status.COMPLETE)
-        CostEntry.objects.create(snapshot=snap_old, date=datetime.date(2024,1,02), subscription=self.sub, resource=self.res, meter=self.meter, cost_in_usd=1, quantity=1, unit_price=1)
+        CostEntry.objects.create(snapshot=snap_old, date=datetime.date(2024,1,2), subscription=self.sub, resource=self.res, meter=self.meter, cost_in_usd=1, quantity=1, unit_price=1)
 
         # latest snapshot for source1
         snap_new = CostReportSnapshot.objects.create(run_id='new', report_date=datetime.date(2024,1,8), file_name='f2', source=self.source1, status=CostReportSnapshot.Status.COMPLETE)
