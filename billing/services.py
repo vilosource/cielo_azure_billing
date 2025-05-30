@@ -67,18 +67,27 @@ class CostCsvImporter:
                             resource_name_val = resource_id_val.rstrip('/')\
                                 .split('/')[-1]
 
+                        rg_raw = row.get('resourceGroupName')
+                        rg_val = rg_raw.strip().lower() if rg_raw else None
+
                         resource, created = Resource.objects.get_or_create(
                             resource_id=resource_id_val,
                             defaults={
                                 'name': row.get('productOrderName'),
                                 'resource_name': resource_name_val,
-                                'resource_group': row.get('resourceGroupName'),
+                                'resource_group': rg_val,
                                 'location': row.get('resourceLocation'),
                             },
                         )
-                        if not created and resource_name_val and not resource.resource_name:
+                        update_fields = []
+                        if resource_name_val and not resource.resource_name:
                             resource.resource_name = resource_name_val
-                            resource.save(update_fields=['resource_name'])
+                            update_fields.append('resource_name')
+                        if rg_val and resource.resource_group != rg_val:
+                            resource.resource_group = rg_val
+                            update_fields.append('resource_group')
+                        if update_fields:
+                            resource.save(update_fields=update_fields)
                         if created:
                             logger.info('Created new resource: %s', resource.resource_id)
 
