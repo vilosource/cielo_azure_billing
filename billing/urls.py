@@ -7,6 +7,11 @@ from .views import (
     ResourceViewSet,
     MeterViewSet,
     CostEntryViewSet,
+    SubscriptionSummaryView,
+    VirtualMachineSummaryView,
+    ResourceGroupSummaryView,
+    MeterCategorySummaryView,
+    RegionSummaryView,
 )
 
 router = DefaultRouter()
@@ -19,4 +24,9 @@ router.register('cost-entries', CostEntryViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('costs/subscription-summary/', SubscriptionSummaryView.as_view()),
+    path('costs/virtual-machines-summary/', VirtualMachineSummaryView.as_view()),
+    path('costs/resource-group-summary/', ResourceGroupSummaryView.as_view()),
+    path('costs/meter-category-summary/', MeterCategorySummaryView.as_view()),
+    path('costs/region-summary/', RegionSummaryView.as_view()),
 ]
