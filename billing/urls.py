@@ -1,7 +1,7 @@
 from rest_framework.routers import DefaultRouter
 from django.urls import path, include
 from .views import (
-    ImportSnapshotViewSet,
+    CostReportSnapshotViewSet,
     CustomerViewSet,
     SubscriptionViewSet,
     ResourceViewSet,
@@ -10,7 +10,7 @@ from .views import (
 )
 
 router = DefaultRouter()
-router.register('snapshots', ImportSnapshotViewSet)
+router.register('snapshots', CostReportSnapshotViewSet)
 router.register('customers', CustomerViewSet)
 router.register('subscriptions', SubscriptionViewSet)
 router.register('resources', ResourceViewSet)

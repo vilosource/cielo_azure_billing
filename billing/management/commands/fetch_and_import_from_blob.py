@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 from django.core.management.base import BaseCommand
-from billing.models import BillingBlobSource, ImportSnapshot
+from billing.models import BillingBlobSource, CostReportSnapshot
 from billing.services import CostCsvImporter
 
 try:
@@ -225,7 +225,7 @@ class Command(BaseCommand):
                     )
                 
                 if (
-                    ImportSnapshot.objects.filter(run_id=run_id).exists()
+                    CostReportSnapshot.objects.filter(run_id=run_id).exists()
                     and not overwrite
                 ):
                     logger.info("Skip existing run %s for %s", run_id, source.name)

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     BillingBlobSource,
-    ImportSnapshot,
+    CostReportSnapshot,
     Customer,
     Subscription,
     Resource,
@@ -10,8 +10,8 @@ from .models import (
 )
 
 
-@admin.register(ImportSnapshot)
-class ImportSnapshotAdmin(admin.ModelAdmin):
+@admin.register(CostReportSnapshot)
+class CostReportSnapshotAdmin(admin.ModelAdmin):
     list_display = (
         "file_name",
         "run_id",

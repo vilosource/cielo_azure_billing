@@ -1,7 +1,7 @@
 import csv
 import logging
 import datetime
-from .models import ImportSnapshot, Customer, Subscription, Resource, Meter, CostEntry
+from .models import CostReportSnapshot, Customer, Subscription, Resource, Meter, CostEntry
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class CostCsvImporter:
     def import_file(self):
         logger.info('Starting import from %s', self.file_path)
         try:
-            snapshot = ImportSnapshot.objects.create(
+            snapshot = CostReportSnapshot.objects.create(
                 file_name=self.file_path,
                 run_id=self.run_id or str(datetime.datetime.utcnow().timestamp()),
                 report_date=self.report_date,

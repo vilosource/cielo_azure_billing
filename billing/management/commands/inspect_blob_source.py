@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 from django.core.management.base import BaseCommand
 
-from billing.models import BillingBlobSource, ImportSnapshot
+from billing.models import BillingBlobSource, CostReportSnapshot
 
 try:
     from azure.identity import DefaultAzureCredential
@@ -351,7 +351,7 @@ class Command(BaseCommand):
 
             logger.debug(f"Extracted run_id: {run_id}, end_date: {end_date}")
 
-            imported = ImportSnapshot.objects.filter(run_id=run_id).exists()
+            imported = CostReportSnapshot.objects.filter(run_id=run_id).exists()
             logger.debug(f"Import status for run_id {run_id}: {imported}")
 
             run_data = {

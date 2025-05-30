@@ -4,9 +4,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Sum
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import ImportSnapshot, Customer, Subscription, Resource, Meter, CostEntry
+from .models import CostReportSnapshot, Customer, Subscription, Resource, Meter, CostEntry
 from .serializers import (
-    ImportSnapshotSerializer,
+    CostReportSnapshotSerializer,
     CustomerSerializer,
     SubscriptionSerializer,
     ResourceSerializer,
@@ -19,9 +19,9 @@ from .utils import get_latest_snapshot_for_date
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 
-class ImportSnapshotViewSet(viewsets.ModelViewSet):
-    queryset = ImportSnapshot.objects.all()
-    serializer_class = ImportSnapshotSerializer
+class CostReportSnapshotViewSet(viewsets.ModelViewSet):
+    queryset = CostReportSnapshot.objects.all()
+    serializer_class = CostReportSnapshotSerializer
     permission_classes = [PublicEndpointPermission]
 
 

@@ -1,10 +1,10 @@
 from rest_framework import serializers
-from .models import ImportSnapshot, Customer, Subscription, Resource, Meter, CostEntry
+from .models import CostReportSnapshot, Customer, Subscription, Resource, Meter, CostEntry
 
 
-class ImportSnapshotSerializer(serializers.ModelSerializer):
+class CostReportSnapshotSerializer(serializers.ModelSerializer):
     class Meta:
-        model = ImportSnapshot
+        model = CostReportSnapshot
         fields = '__all__'
 
 
@@ -38,7 +38,7 @@ class CostEntrySerializer(serializers.ModelSerializer):
     subscription = SubscriptionSerializer(read_only=True)
     resource = ResourceSerializer(read_only=True)
     meter = MeterSerializer(read_only=True)
-    snapshot = ImportSnapshotSerializer(read_only=True)
+    snapshot = CostReportSnapshotSerializer(read_only=True)
 
     class Meta:
         model = CostEntry

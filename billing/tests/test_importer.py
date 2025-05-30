@@ -2,7 +2,7 @@ import json
 import datetime
 from django.test import TestCase
 from billing.services import CostCsvImporter
-from billing.models import ImportSnapshot, Subscription, CostEntry
+from billing.models import CostReportSnapshot, Subscription, CostEntry
 
 class CostCsvImporterTests(TestCase):
     def _write_csv(self, path, rows):
@@ -75,7 +75,7 @@ class CostCsvImporterTests(TestCase):
             importer = CostCsvImporter(csv_path, run_id=run_id, report_date=datetime.date(2024,1,1))
             importer.import_file()
 
-            self.assertEqual(ImportSnapshot.objects.count(), 1)
+            self.assertEqual(CostReportSnapshot.objects.count(), 1)
             self.assertEqual(Subscription.objects.count(), 2)
             self.assertEqual(CostEntry.objects.count(), 2)
 
@@ -100,6 +100,22 @@ class CostCsvImporterTests(TestCase):
                 'unitOfMeasure': 'u',
                 'date': '01/01/2024',
                 'costInUsd': '1'
+            }, {
+                'customerTenantId': 't1',
+                'SubscriptionId': 'sub2',
+                'subscriptionName': 'Sub Two',
+                'ResourceId': '/r2',
+                'productOrderName': 'prod',
+                'resourceGroupName': 'rg',
+                'resourceLocation': 'loc',
+                'meterId': 'm1',
+                'meterName': 'Meter',
+                'meterCategory': 'cat',
+                'meterSubCategory': 'sub',
+                'serviceFamily': 'fam',
+                'unitOfMeasure': 'u',
+                'date': '01/01/2024',
+                'costInUsd': '2'
             }])
             importer = CostCsvImporter(csv1, run_id='run1', report_date=datetime.date(2024,1,1))
             importer.import_file()
@@ -126,7 +142,7 @@ class CostCsvImporterTests(TestCase):
             importer = CostCsvImporter(csv2, run_id='run2', report_date=datetime.date(2024,1,2))
             importer.import_file()
 
-            latest = ImportSnapshot.objects.latest_per_subscription()
+            latest = CostReportSnapshot.objects.latest_per_subscription()
             ids = [s.run_id for s in latest]
             self.assertIn('run2', ids)
             self.assertIn('run1', ids)

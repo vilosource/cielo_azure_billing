@@ -21,7 +21,7 @@ class BillingBlobSource(models.Model):
         return self.name
 
 
-class ImportSnapshotQuerySet(models.QuerySet):
+class CostReportSnapshotQuerySet(models.QuerySet):
     def latest_per_subscription(self):
         from django.db.models import Max
 
@@ -37,7 +37,7 @@ class ImportSnapshotQuerySet(models.QuerySet):
         return self.filter(report_date=target_date)
 
 
-class ImportSnapshot(models.Model):
+class CostReportSnapshot(models.Model):
     run_id = models.CharField(max_length=64, unique=True, db_index=True)
     report_date = models.DateField(null=True, blank=True)
     file_name = models.CharField(max_length=255)
@@ -46,7 +46,7 @@ class ImportSnapshot(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
-    objects = ImportSnapshotQuerySet.as_manager()
+    objects = CostReportSnapshotQuerySet.as_manager()
 
     class Meta:
         ordering = ["-created_at"]
@@ -95,7 +95,7 @@ class Meter(models.Model):
 
 
 class CostEntry(models.Model):
-    snapshot = models.ForeignKey(ImportSnapshot, on_delete=models.CASCADE)
+    snapshot = models.ForeignKey(CostReportSnapshot, on_delete=models.CASCADE)
     date = models.DateField(db_index=True)
     subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE)
     resource = models.ForeignKey(Resource, on_delete=models.CASCADE)
