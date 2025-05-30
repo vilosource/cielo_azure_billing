@@ -61,14 +61,24 @@ class CostCsvImporter:
                             subscription.name = row.get('subscriptionName')
                             subscription.save(update_fields=['name'])
 
+                        resource_id_val = row.get('ResourceId')
+                        resource_name_val = None
+                        if resource_id_val:
+                            resource_name_val = resource_id_val.rstrip('/')\
+                                .split('/')[-1]
+
                         resource, created = Resource.objects.get_or_create(
-                            resource_id=row.get('ResourceId'),
+                            resource_id=resource_id_val,
                             defaults={
                                 'name': row.get('productOrderName'),
+                                'resource_name': resource_name_val,
                                 'resource_group': row.get('resourceGroupName'),
                                 'location': row.get('resourceLocation'),
                             },
                         )
+                        if not created and resource_name_val and not resource.resource_name:
+                            resource.resource_name = resource_name_val
+                            resource.save(update_fields=['resource_name'])
                         if created:
                             logger.info('Created new resource: %s', resource.resource_id)
 

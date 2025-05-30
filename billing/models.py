@@ -364,6 +364,7 @@ class Subscription(models.Model):
 
 class Resource(models.Model):
     resource_id = models.TextField(unique=True)
+    resource_name = models.CharField(max_length=255, null=True, blank=True)
     name = models.CharField(max_length=255, null=True, blank=True)
     resource_group = models.CharField(max_length=255, null=True, blank=True)
     location = models.CharField(max_length=255, null=True, blank=True)

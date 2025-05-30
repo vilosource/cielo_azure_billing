@@ -22,6 +22,10 @@ values remain immutable and can be compared over time.
    ```bash
    poetry run python manage.py import_cost_csv --file path/to/file.csv
    ```
+5. Populate `resource_name` for existing resources:
+   ```bash
+   poetry run python manage.py backfill_resource_name
+   ```
 
 A default admin user (`admin`/`admin`) is created on first run. Visit `/admin/`
 to explore the imported data.
