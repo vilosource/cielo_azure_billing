@@ -18,13 +18,21 @@ def parse_date(date_str):
         return None
 
 class CostCsvImporter:
-    def __init__(self, file_path):
+    def __init__(self, file_path, run_id=None, report_date=None, source=None):
         self.file_path = file_path
+        self.run_id = run_id
+        self.report_date = report_date
+        self.source = source
 
     def import_file(self):
         logger.info('Starting import from %s', self.file_path)
         try:
-            snapshot = ImportSnapshot.objects.create(file_name=self.file_path)
+            snapshot = ImportSnapshot.objects.create(
+                file_name=self.file_path,
+                run_id=self.run_id or str(datetime.datetime.utcnow().timestamp()),
+                report_date=self.report_date,
+                source=self.source,
+            )
             logger.info('Created snapshot record: %s', snapshot.id)
         except Exception as e:
             logger.error('Failed to create snapshot: %s', e)
