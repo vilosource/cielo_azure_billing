@@ -39,6 +39,7 @@ cielo_azure_billing/
 ```python
 class ImportSnapshot(models.Model):
     snapshot_date = models.DateField(auto_now_add=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     file_name = models.CharField(max_length=255)
 ```
 
@@ -77,6 +78,7 @@ class Meter(models.Model):
     name = models.CharField(max_length=255)
     category = models.CharField(max_length=255)
     subcategory = models.CharField(max_length=255, null=True, blank=True)
+    service_family = models.CharField(max_length=255, null=True, blank=True)
     unit = models.CharField(max_length=64)
 ```
 
@@ -97,7 +99,20 @@ class CostEntry(models.Model):
     payg_price = models.DecimalField(max_digits=12, decimal_places=6, null=True, blank=True)
     pricing_model = models.CharField(max_length=64, null=True, blank=True)
     charge_type = models.CharField(max_length=64, null=True, blank=True)
+    publisher_name = models.CharField(max_length=255, null=True, blank=True)
+    cost_center = models.CharField(max_length=255, null=True, blank=True)
     tags = models.JSONField(null=True, blank=True)
+
+    class Meta:
+        unique_together = (
+            'snapshot',
+            'date',
+            'subscription',
+            'resource',
+            'meter',
+            'quantity',
+            'unit_price',
+        )
 ```
 
 ## Import Logic
@@ -121,62 +136,25 @@ class CostEntry(models.Model):
 
 ```python
 from django.core.management.base import BaseCommand
-import csv
-from billing.models import ImportSnapshot, Customer, Subscription, Resource, Meter, CostEntry
-from datetime import date
+from billing.services import CostCsvImporter
+
 
 class Command(BaseCommand):
-    help = 'Import an Azure cost CSV file'
+    """Import an Azure cost CSV file."""
 
     def add_arguments(self, parser):
-        parser.add_argument('--file', type=str, required=True, help='Path to the CSV file')
+        parser.add_argument("--file", required=True, help="Path to the CSV file")
 
     def handle(self, *args, **options):
-        file_path = options['file']
-        snapshot = ImportSnapshot.objects.create(file_name=file_path)
-        with open(file_path, newline='', encoding='utf-8') as csvfile:
-            reader = csv.DictReader(csvfile)
-            count = 0
-            for row in reader:
-                customer, _ = Customer.objects.get_or_create(
-                    tenant_id=row['customerTenantId']
-                )
-
-                subscription, _ = Subscription.objects.get_or_create(
-                    subscription_id=row['SubscriptionId'],
-                    defaults={'name': row['subscriptionName'], 'customer': customer}
-                )
-
-                resource, _ = Resource.objects.get_or_create(
-                    resource_id=row['ResourceId'],
-                    defaults={'name': row.get('productOrderName'), 'resource_group': row.get('resourceGroupName'), 'location': row.get('resourceLocation')}
-                )
-
-                meter, _ = Meter.objects.get_or_create(
-                    meter_id=row['meterId'],
-                    defaults={'name': row['meterName'], 'category': row['meterCategory'], 'subcategory': row.get('meterSubCategory'), 'unit': row['unitOfMeasure']}
-                )
-
-                CostEntry.objects.create(
-                    snapshot=snapshot,
-                    date=row['date'],
-                    subscription=subscription,
-                    resource=resource,
-                    meter=meter,
-                    cost_in_usd=row.get('costInUsd') or 0,
-                    cost_in_billing_currency=row.get('costInBillingCurrency') or 0,
-                    billing_currency=row.get('billingCurrency'),
-                    quantity=row.get('quantity') or 0,
-                    unit_price=row.get('unitPrice') or 0,
-                    payg_price=row.get('PayGPrice') or 0,
-                    pricing_model=row.get('pricingModel'),
-                    charge_type=row.get('chargeType'),
-                    tags=row.get('tags') or None
-                )
-                count += 1
-
-        self.stdout.write(self.style.SUCCESS(f"Imported {count} entries from {file_path}"))
+        importer = CostCsvImporter(options["file"])
+        count = importer.import_file()
+        self.stdout.write(self.style.SUCCESS(f"Imported {count} entries"))
 ```
+
+The `CostCsvImporter` service encapsulates all parsing and database logic. It
+normalizes dates and processes optional fields such as `serviceFamily`,
+`publisherName` and `costCenter` while creating a new `ImportSnapshot` for every
+execution.
 
 * Run via Django management command:
 
