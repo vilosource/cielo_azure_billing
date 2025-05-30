@@ -1,5 +1,10 @@
+import logging
+
 from .models import CostReportSnapshot
 from .models import BillingBlobSource
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_latest_snapshot_for_date(billing_date):
@@ -31,8 +36,10 @@ def get_latest_snapshots(date=None):
         snap = qs.order_by('-created_at').first()
         if snap:
             snapshots.append(snap)
+            logger.debug("Resolved snapshot %s for source %s", snap.id, source.name)
         else:
             reason = 'no snapshot for date' if date else 'no snapshot'
             missing.append({'name': source.name, 'reason': reason})
+            logger.debug("No snapshot for source %s: %s", source.name, reason)
     return snapshots, missing
 
