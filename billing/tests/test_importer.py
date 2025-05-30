@@ -79,6 +79,9 @@ class CostCsvImporterTests(TestCase):
             self.assertEqual(Subscription.objects.count(), 2)
             self.assertEqual(CostEntry.objects.count(), 2)
 
+            snap = CostReportSnapshot.objects.first()
+            self.assertEqual(snap.status, CostReportSnapshot.Status.COMPLETE)
+
     def test_latest_per_subscription(self):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
@@ -148,4 +151,39 @@ class CostCsvImporterTests(TestCase):
             self.assertIn('run1', ids)
             # ensure run2 is returned instead of run1 for sub1
             self.assertEqual(ids.count('run2'), 1)
+
+            for snap in CostReportSnapshot.objects.all():
+                self.assertEqual(snap.status, CostReportSnapshot.Status.COMPLETE)
+
+    def test_for_day_filters_status(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = f"{tmp}/cost.csv"
+            self._write_csv(csv_path, [{
+                'customerTenantId': 't1',
+                'SubscriptionId': 'sub1',
+                'subscriptionName': 'Sub One',
+                'ResourceId': '/r1',
+                'productOrderName': 'prod',
+                'resourceGroupName': 'rg',
+                'resourceLocation': 'loc',
+                'meterId': 'm1',
+                'meterName': 'Meter',
+                'meterCategory': 'cat',
+                'meterSubCategory': 'sub',
+                'serviceFamily': 'fam',
+                'unitOfMeasure': 'u',
+                'date': '01/01/2024',
+                'costInUsd': '1'
+            }])
+            importer = CostCsvImporter(csv_path, run_id='run1', report_date=datetime.date(2024,1,1))
+            importer.import_file()
+
+            snap = CostReportSnapshot.objects.first()
+            self.assertEqual(CostReportSnapshot.objects.for_day(datetime.date(2024,1,1)).count(), 1)
+
+            snap.status = CostReportSnapshot.Status.FAILED
+            snap.save(update_fields=['status'])
+
+            self.assertEqual(CostReportSnapshot.objects.for_day(datetime.date(2024,1,1)).count(), 0)
 

@@ -32,6 +32,7 @@ class CostCsvImporter:
                 run_id=self.run_id or str(datetime.datetime.utcnow().timestamp()),
                 report_date=self.report_date,
                 source=self.source,
+                status=CostReportSnapshot.Status.IN_PROGRESS,
             )
             logger.info('Created snapshot record: %s', snapshot.id)
         except Exception as e:
@@ -117,8 +118,12 @@ class CostCsvImporter:
                         logger.error('Error processing row: %s. Row data: %s', e, {k: v for k, v in row.items() if k in ['date', 'costInUsd', 'SubscriptionId', 'ResourceId']})
                         continue
 
+            snapshot.status = CostReportSnapshot.Status.COMPLETE
+            snapshot.save(update_fields=['status'])
             logger.info('Imported %s entries from %s', count, self.file_path)
             return count
         except Exception as e:
+            snapshot.status = CostReportSnapshot.Status.FAILED
+            snapshot.save(update_fields=['status'])
             logger.error('Import failed: %s', e)
             raise
