@@ -155,15 +155,22 @@ class BaseSummaryView(APIView):
         filterset = self.filterset_class(request.GET, queryset=queryset)
         queryset = filterset.qs
 
-        values_args = {}
-        for key, expr in self.group_by.items():
-            values_args[key] = expr
+        # Use temporary annotation names to avoid conflicts with model fields
+        annotated_fields = {f"_{k}": v for k, v in self.group_by.items()}
 
         data = list(
-            queryset.values(**values_args)
+            queryset
+            .annotate(**annotated_fields)
+            .values(*annotated_fields.keys())
             .annotate(total_usd=Sum('cost_in_usd'))
             .order_by()
         )
+
+        # Rename temporary annotation keys to the expected response keys
+        for row in data:
+            for key in list(annotated_fields.keys()):
+                alias = key.lstrip('_')
+                row[alias] = row.pop(key)
 
         response_data = {
             'date': date.isoformat() if date else None,
