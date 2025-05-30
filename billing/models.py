@@ -297,8 +297,12 @@ class CostReportSnapshotQuerySet(models.QuerySet):
     def latest_per_subscription(self):
         from django.db.models import Max
 
-        latest = CostEntry.objects.values("subscription_id").annotate(
-            latest_id=Max("snapshot_id")
+        latest = (
+            CostEntry.objects.filter(
+                snapshot__status=CostReportSnapshot.Status.COMPLETE
+            )
+            .values("subscription_id")
+            .annotate(latest_id=Max("snapshot_id"))
         )
         return self.filter(id__in=[item["latest_id"] for item in latest])
 
@@ -306,15 +310,29 @@ class CostReportSnapshotQuerySet(models.QuerySet):
         return self.order_by("-created_at").first()
 
     def for_day(self, target_date):
-        return self.filter(report_date=target_date)
+        return self.filter(
+            report_date=target_date,
+            status=CostReportSnapshot.Status.COMPLETE,
+        )
 
 
 class CostReportSnapshot(models.Model):
+    class Status(models.TextChoices):
+        IN_PROGRESS = "in_progress", "In Progress"
+        COMPLETE = "complete", "Complete"
+        FAILED = "failed", "Failed"
+
     run_id = models.CharField(max_length=64, unique=True, db_index=True)
     report_date = models.DateField(null=True, blank=True)
     file_name = models.CharField(max_length=255)
     source = models.ForeignKey(
         "BillingBlobSource", null=True, on_delete=models.SET_NULL
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.IN_PROGRESS,
+        db_index=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
