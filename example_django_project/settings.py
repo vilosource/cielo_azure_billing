@@ -30,7 +30,7 @@ MIDDLEWARE = [
     'cielo.azure.cost_analysis.middleware.RequestLoggingMiddleware',
 ]
 
-ROOT_URLCONF = 'cielo_azure_billing.urls'
+ROOT_URLCONF = 'example_django_project.urls'
 
 TEMPLATES = [
     {
@@ -48,7 +48,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'cielo_azure_billing.wsgi.application'
+WSGI_APPLICATION = 'example_django_project.wsgi.application'
 
 DATABASES = {
     'default': {
