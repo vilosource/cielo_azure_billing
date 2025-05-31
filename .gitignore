@@ -1,4 +1,6 @@
-blob_sources.yml
+db.sqlite3-journal
+bd/
+blob_sources.json
 *.csv
 blob_downloads/
 
