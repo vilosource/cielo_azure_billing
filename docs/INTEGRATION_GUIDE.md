@@ -8,7 +8,7 @@ existing project.
 
 1. Install the package from your local checkout or wheel:
    ```bash
-   pip install -e /path/to/cielo_azure_billing
+   pip install -e /path/to/example_django_project
    ```
    or if published to PyPI:
    ```bash
@@ -39,6 +39,13 @@ existing project.
    python manage.py migrate
    ```
 
+## Project Layout
+
+The repository includes a minimal example project named
+`example_django_project`. It uses a local SQLite database and enables caching
+through the `COST_CACHE_IMPLEMENTATION` setting. Use this project as a template
+when integrating the app into your own codebase.
+
 ## Using the Application
 
 The app exposes a REST API for cost data. After running the server you can visit
@@ -51,3 +58,23 @@ If you are adding the cost analysis app to an existing Django project, make sure
 any custom authentication or caching settings are compatible with the defaults
 provided in `cielo.azure.cost_analysis`. Review the example `settings.py` in this
 repository for guidance on logging and middleware configuration.
+
+## Caching
+
+Summary API endpoints store results using the helper in
+`cielo.azure.cost_analysis.caching`. Configure
+`COST_CACHE_IMPLEMENTATION` in your settings to `"memory"` or `"redis"` to select
+the backend.
+
+## Management Commands
+
+Use the provided management commands to import cost data and maintain resource
+information:
+
+```bash
+python manage.py import_cost_csv --file path/to/report.csv
+python manage.py backfill_resource_name
+python manage.py fetch_and_import_from_blob
+```
+
+Schedule these commands as needed to keep your cost database up to date.

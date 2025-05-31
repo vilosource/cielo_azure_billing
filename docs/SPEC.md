@@ -7,8 +7,8 @@ Develop a **self-contained Django project** to import daily Azure cost CSV repor
 ## Project Structure
 
 ```
-cielo_azure_billing/
-├── cielo_azure_billing/              # Django project root
+example_django_project/
+├── example_django_project/           # Django project root
 │   ├── settings.py
 │   ├── urls.py
 ├── billing/                # Main app for models and logic
