@@ -5,8 +5,10 @@ the data through a REST API. Each import is stored as a snapshot so historical
 values remain immutable and can be compared over time.
 
 The Django app lives in the `cielo.azure.cost_analysis` Python package and can
-be installed with `pip`. See `docs/INTEGRATION_GUIDE.md` for details on
-integrating it into your own project.
+be installed with `pip`. A small demonstration project named
+`example_django_project` is included in this repository. See
+`docs/INTEGRATION_GUIDE.md` for details on integrating the app into your own
+project.
 
 ## Quick start
 

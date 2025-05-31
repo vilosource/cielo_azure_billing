@@ -27,7 +27,7 @@ from .utils import (
     latest_snapshot_ids_for_date,
     get_cost_entries_for_date,
 )
-from caching import get_cache_backend
+from .caching import get_cache_backend
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
 # Shared filter parameter docs for cost summary endpoints
