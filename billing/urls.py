@@ -34,5 +34,5 @@ urlpatterns = [
     path('costs/region-summary/', RegionSummaryView.as_view()),
     path('costs/available-report-dates/', AvailableReportDatesView.as_view()),
     path('costs/resource-group-totals/', ResourceGroupTotalsView.as_view()),
-    path('snapshots/available-report-dates/', SnapshotReportDatesView.as_view()),
+    path('reports/available-report-dates/', SnapshotReportDatesView.as_view()),
 ]

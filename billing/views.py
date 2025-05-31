@@ -497,9 +497,11 @@ class SnapshotReportDatesView(APIView):
     """Return distinct ``report_date`` values from completed snapshots."""
     permission_classes = [PublicEndpointPermission]
 
+
     def get(self, request):
         logger.info("SnapshotReportDatesView request received")
 
+        print("========= SnapshotReportDatesView initialized =========")
         start_time = datetime.datetime.now()
 
         # Log any query parameters if present

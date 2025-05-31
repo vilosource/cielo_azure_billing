@@ -99,8 +99,8 @@ LOGGING = {
             'format': '{levelname} {message}',
             'style': '{',
         },
-        'flow': {
-            'format': '{levelname} {asctime} {module} {funcName} {lineno} {message}',
+        'debug_verbose': {
+            'format': 'DEBUG {asctime} {module}.{funcName}:{lineno} {message}',
             'style': '{',
         },
     },
@@ -108,12 +108,23 @@ LOGGING = {
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
+            'level': 'DEBUG',
+        },
+        'console_debug': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'debug_verbose',
+            'level': 'DEBUG',
         },
         'file': {
             'class': 'logging.FileHandler',
             'filename': 'billing.log',
             'formatter': 'verbose',
+            'level': 'DEBUG',
         },
+    },
+    'root': {
+        'level': 'INFO',
+        'handlers': ['console'],
     },
     'loggers': {
         'django': {
@@ -127,7 +138,17 @@ LOGGING = {
             'propagate': False,
         },
         'billing': {
-            'handlers': ['console', 'file'],
+            'handlers': ['console_debug', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'billing.views': {
+            'handlers': ['console_debug', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'billing.management': {
+            'handlers': ['console_debug', 'file'], 
             'level': 'DEBUG',
             'propagate': False,
         },
