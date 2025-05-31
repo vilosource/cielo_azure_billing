@@ -1,7 +1,6 @@
 import logging
 
-from .models import CostReportSnapshot
-from .models import BillingBlobSource
+from .models import CostReportSnapshot, BillingBlobSource, CostEntry
 
 
 logger = logging.getLogger(__name__)
@@ -42,4 +41,19 @@ def get_latest_snapshots(date=None):
             missing.append({'name': source.name, 'reason': reason})
             logger.debug("No snapshot for source %s: %s", source.name, reason)
     return snapshots, missing
+
+
+def latest_snapshot_ids_for_date(date):
+    """Return snapshot IDs of the latest import per subscription for ``date``."""
+    from django.db.models import Max
+
+    return (
+        CostEntry.objects.filter(
+            date=date,
+            snapshot__status=CostReportSnapshot.Status.COMPLETE,
+        )
+        .values("subscription_id")
+        .annotate(latest_id=Max("snapshot_id"))
+        .values_list("latest_id", flat=True)
+    )
 

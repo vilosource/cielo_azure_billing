@@ -43,4 +43,32 @@ class SubscriptionSummaryAPITests(TestCase):
         self.assertEqual(len(data), 1)
         self.assertEqual(data[0]['subscription_id'], 'sub1')
 
+    def test_latest_snapshot_per_subscription(self):
+        date = datetime.date(2024, 1, 1)
+        newer = CostReportSnapshot.objects.create(
+            run_id='r3',
+            report_date=date,
+            file_name='f3',
+            source=self.source1,
+            status=CostReportSnapshot.Status.COMPLETE,
+        )
+        CostEntry.objects.create(
+            snapshot=newer,
+            date=date,
+            subscription=self.sub1,
+            resource=self.res,
+            meter=self.meter,
+            cost_in_usd=5,
+            quantity=1,
+            unit_price=1,
+        )
+
+        resp = self.client.get('/api/costs/subscription-summary/?date=2024-01-01')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()['data']
+        self.assertEqual(len(data), 2)
+        for item in data:
+            if item['subscription_id'] == 'sub1':
+                self.assertEqual(item['total_usd'], '5.0000')
+
 

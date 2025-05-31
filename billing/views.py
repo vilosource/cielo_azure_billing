@@ -17,7 +17,11 @@ from .serializers import (
 )
 from .permissions import PublicEndpointPermission
 from .filters import CostEntryFilter, CostSummaryFilter
-from .utils import get_latest_snapshot_for_date, get_latest_snapshots
+from .utils import (
+    get_latest_snapshot_for_date,
+    get_latest_snapshots,
+    latest_snapshot_ids_for_date,
+)
 from caching import get_cache_backend
 from drf_spectacular.utils import extend_schema, OpenApiParameter
 
@@ -184,11 +188,12 @@ class BaseSummaryView(APIView):
             return Response(cached)
 
         snapshots, missing = get_latest_snapshots(date)
-        snapshot_ids = [s.id for s in snapshots]
-
-        queryset = CostEntry.objects.filter(snapshot_id__in=snapshot_ids)
         if date:
-            queryset = queryset.filter(date=date)
+            snapshot_ids = list(latest_snapshot_ids_for_date(date))
+            queryset = CostEntry.objects.filter(snapshot_id__in=snapshot_ids, date=date)
+        else:
+            snapshot_ids = [s.id for s in snapshots]
+            queryset = CostEntry.objects.filter(snapshot_id__in=snapshot_ids)
 
         filter_data = self.get_filter_data(request)
         filterset = self.filterset_class(filter_data, queryset=queryset)
