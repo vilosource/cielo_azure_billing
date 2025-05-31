@@ -391,7 +391,7 @@ class CostEntryQuerySet(models.QuerySet):
     def latest_for_day(self, target_date):
         """Return entries from the latest snapshot per subscription for ``target_date``."""
         from django.db.models import Max
-
+        logger.debug(f"Fetching latest cost entries for date: {target_date}")
         latest_ids = (
             self.model.objects.filter(
                 date=target_date,

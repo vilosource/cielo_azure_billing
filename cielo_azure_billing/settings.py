@@ -5,7 +5,6 @@ SECRET_KEY = 'django-insecure-change-me'
 DEBUG = True
 ALLOWED_HOSTS = []
 
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -93,11 +92,15 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
+            'format': '{levelname} {asctime} {module} {funcName} {lineno} {message}',
             'style': '{',
         },
         'simple': {
             'format': '{levelname} {message}',
+            'style': '{',
+        },
+        'flow': {
+            'format': '{levelname} {asctime} {module} {funcName} {lineno} {message}',
             'style': '{',
         },
     },
