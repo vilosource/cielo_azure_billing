@@ -42,6 +42,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, **options):
+        # Extract options
         source_name = options.get("source_name")
         period = options.get("billing_period")
         base_output_dir = options["output_dir"]
@@ -49,30 +50,148 @@ class Command(BaseCommand):
         skip_csv = options.get("skip_csv", False)
         list_only = options.get("list_only", False)
 
-        # Create base output directory if it doesn't exist (unless we're only listing)
-        if not list_only:
-            os.makedirs(base_output_dir, exist_ok=True)
+        # Print command title
+        self.stdout.write(self.style.SUCCESS("=" * 80))
+        if list_only:
+            self.stdout.write(self.style.SUCCESS("Azure Billing Source File Listing"))
+        else:
+            self.stdout.write(self.style.SUCCESS("Azure Billing Source File Downloader"))
+        self.stdout.write(self.style.SUCCESS("=" * 80))
+        self.stdout.write("")
 
+        # Print configuration details
+        self._print_config(period, base_output_dir, list_only, overwrite, skip_csv)
+        
+        # Display all system sources first
+        self._print_all_system_sources(source_name)
+        
         # Get sources to process
         sources = self._get_sources(source_name)
         if not sources:
-            self.stdout.write(self.style.ERROR("No active billing sources found."))
+            self.stdout.write(self.style.ERROR("No active billing sources found to process."))
             return
 
-        self._print_header(sources, period, base_output_dir, list_only)
-        
+        # Create base output directory if it doesn't exist (unless we're only listing)
+        if not list_only:
+            os.makedirs(base_output_dir, exist_ok=True)
+            
         # Process each source
-        for source in sources:
-            self.stdout.write(self.style.SUCCESS(f"Processing source: {source.name}"))
+        self._process_sources(sources, period, base_output_dir, overwrite, skip_csv, list_only)
+        
+    def _print_config(self, period, output_dir, list_only, overwrite, skip_csv):
+        """Print configuration details"""
+        self.stdout.write(self.style.SUCCESS("🔧 Configuration:"))
+        self.stdout.write(f"  Billing Period: {period or 'All available'}")
+        if not list_only:
+            self.stdout.write(f"  Output Directory: {output_dir}")
+            self.stdout.write(f"  Overwrite Existing Files: {'Yes' if overwrite else 'No'}")
+            self.stdout.write(f"  Skip CSV Downloads: {'Yes' if skip_csv else 'No'}")
+        self.stdout.write(f"  Operation Mode: {'List Only' if list_only else 'Download'}")
+        self.stdout.write("")
+    
+    def _print_all_system_sources(self, requested_source_name=None):
+        """Print a table of all sources in the system"""
+        all_sources = BillingBlobSource.objects.all().order_by('name')
+        
+        if not all_sources:
+            self.stdout.write(self.style.WARNING("No billing sources defined in the system."))
+            return
+            
+        self.stdout.write(self.style.SUCCESS("📂 Available Blob Sources:"))
+        self.stdout.write(self.style.SUCCESS("=" * 80))
+        self.stdout.write(f"{'Name':<20} | {'Status':<10} | {'Last Import':<20} | {'Base Folder'}")
+        self.stdout.write("-" * 80)
+        
+        for source in all_sources:
+            status_icon = "✅" if source.is_active else "❌"
+            status = f"{status_icon} {'Active' if source.is_active else 'Inactive'}"
+            last_import = source.last_imported_at or "Never"
+            
+            # Highlight the requested source if specified
+            if requested_source_name and source.name == requested_source_name:
+                self.stdout.write(self.style.SUCCESS(f"{source.name:<20} | {status:<10} | {last_import!s:<20} | {source.base_folder}"))
+            else:
+                self.stdout.write(f"{source.name:<20} | {status:<10} | {last_import!s:<20} | {source.base_folder}")
+        
+        self.stdout.write(self.style.SUCCESS("=" * 80))
+        self.stdout.write("")
+        
+    def _process_sources(self, sources, period, base_output_dir, overwrite, skip_csv, list_only):
+        """Process all selected sources"""
+        self.stdout.write(self.style.SUCCESS(f"Processing {len(sources)} active source(s)..."))
+        self.stdout.write("")
+        
+        # Initialize statistics
+        stats = {
+            'sources_processed': 0,
+            'sources_successful': 0,
+            'sources_failed': 0,
+            'runs_processed': 0,
+            'runs_failed': 0,
+            'files_downloaded': 0,
+            'files_skipped': 0,
+            'errors': []
+        }
+        
+        for idx, source in enumerate(sources, 1):
+            self.stdout.write(self.style.SUCCESS(f"[{idx}/{len(sources)}] Processing: {source.name}"))
+            stats['sources_processed'] += 1
+            
             try:
                 if list_only:
                     self._list_source_files(source, period)
+                    stats['sources_successful'] += 1
                 else:
-                    self._process_source(source, period, base_output_dir, overwrite, skip_csv)
+                    source_stats = self._process_source(source, period, base_output_dir, overwrite, skip_csv)
+                    stats['sources_successful'] += 1
+                    
+                    # Update statistics
+                    if source_stats:
+                        stats['runs_processed'] += source_stats.get('runs_processed', 0)
+                        stats['runs_failed'] += source_stats.get('runs_failed', 0)
+                        stats['files_downloaded'] += source_stats.get('files_downloaded', 0)
+                        stats['files_skipped'] += source_stats.get('files_skipped', 0)
+                        
             except Exception as exc:
-                self.stdout.write(self.style.ERROR(f"Error processing source {source.name}: {exc}"))
+                error_msg = f"Error processing source {source.name}: {exc}"
+                stats['sources_failed'] += 1
+                stats['errors'].append(error_msg)
+                self.stdout.write(self.style.ERROR(error_msg))
                 logger.exception(f"Error processing source {source.name}")
-                continue
+            
+            self.stdout.write("")
+        
+        # Print final summary
+        self._print_final_summary(stats, list_only)
+    
+    def _print_final_summary(self, stats, list_only):
+        """Print a final summary of processing results"""
+        self.stdout.write(self.style.SUCCESS("=" * 80))
+        self.stdout.write(self.style.SUCCESS("📊 Final Summary"))
+        self.stdout.write(self.style.SUCCESS("=" * 80))
+        
+        self.stdout.write(f"Sources processed: {stats['sources_processed']}")
+        self.stdout.write(f"Sources successful: {stats['sources_successful']}")
+        
+        if not list_only:
+            self.stdout.write(f"Runs processed: {stats['runs_processed']}")
+            self.stdout.write(f"Files downloaded: {stats['files_downloaded']}")
+            self.stdout.write(f"Files skipped (already existed): {stats['files_skipped']}")
+        
+        if stats['sources_failed'] > 0:
+            self.stdout.write("")
+            self.stdout.write(self.style.ERROR(f"Sources failed: {stats['sources_failed']}"))
+            for error in stats['errors']:
+                self.stdout.write(self.style.ERROR(f"  • {error}"))
+        
+        # Overall status
+        self.stdout.write("")
+        if stats['sources_failed'] == 0:
+            self.stdout.write(self.style.SUCCESS("✅ All sources processed successfully!"))
+        else:
+            self.stdout.write(self.style.WARNING(f"⚠️ {stats['sources_failed']} out of {stats['sources_processed']} sources had errors"))
+        
+        self.stdout.write(self.style.SUCCESS("=" * 80))
 
     def _get_sources(self, source_name):
         """Get billing sources to process"""
@@ -80,9 +199,31 @@ class Command(BaseCommand):
             sources = BillingBlobSource.objects.filter(name=source_name, is_active=True)
             if not sources:
                 self.stdout.write(self.style.ERROR(f"No active billing source found with name: {source_name}"))
+                self._show_available_sources()
             return sources
         else:
             return BillingBlobSource.objects.filter(is_active=True)
+            
+    def _show_available_sources(self):
+        """Show all available sources in the system"""
+        all_sources = BillingBlobSource.objects.all().order_by('name')
+        
+        if not all_sources:
+            self.stdout.write(self.style.WARNING("No billing sources defined in the system."))
+            return
+            
+        self.stdout.write("")
+        self.stdout.write(self.style.SUCCESS("Available Sources in System:"))
+        self.stdout.write(self.style.SUCCESS("=" * 60))
+        self.stdout.write(f"{'Name':<20} | {'Status':<10} | {'Last Import':<20}")
+        self.stdout.write("-" * 60)
+        
+        for source in all_sources:
+            status = "✅ Active" if source.is_active else "❌ Inactive"
+            last_import = source.last_imported_at or "Never"
+            self.stdout.write(f"{source.name:<20} | {status:<10} | {last_import!s:<20}")
+        
+        self.stdout.write("")
 
     def _print_header(self, sources, period, output_dir, list_only=False):
         """Print the command header"""
@@ -93,12 +234,25 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("Azure Billing Source File Downloader"))
         self.stdout.write(self.style.SUCCESS("=" * 80))
         
-        source_names = ", ".join([source.name for source in sources])
-        self.stdout.write(f"Sources: {source_names}")
-        self.stdout.write(f"Billing Period: {period or 'All available'}")
+        # Print configuration details
+        self.stdout.write(self.style.SUCCESS("🔧 Configuration:"))
+        self.stdout.write(f"  Billing Period: {period or 'All available'}")
         if not list_only:
-            self.stdout.write(f"Output Directory: {output_dir}")
-        self.stdout.write(f"Mode: {'List Only' if list_only else 'Download'}")
+            self.stdout.write(f"  Output Directory: {output_dir}")
+        self.stdout.write(f"  Mode: {'List Only' if list_only else 'Download'}")
+        self.stdout.write("")
+        
+        # Print detailed sources information
+        self.stdout.write(self.style.SUCCESS("📂 Available Blob Sources:"))
+        self.stdout.write(self.style.SUCCESS("=" * 60))
+        self.stdout.write(f"{'Name':<20} | {'Status':<10} | {'Last Import':<20} | {'Base Folder'}")
+        self.stdout.write("=" * 80)
+        
+        for source in sources:
+            status = "✅ Active" if source.is_active else "❌ Inactive"
+            last_import = source.last_imported_at or "Never"
+            self.stdout.write(f"{source.name:<20} | {status:<10} | {last_import!s:<20} | {source.base_folder}")
+        
         self.stdout.write(self.style.SUCCESS("=" * 80))
         self.stdout.write("")
 
@@ -106,13 +260,21 @@ class Command(BaseCommand):
         """Process downloads for a single billing source"""
         self.stdout.write(f"Examining source: {source.name} (base folder: {source.base_folder})")
         
+        # Initialize source-level statistics
+        source_stats = {
+            'runs_processed': 0,
+            'runs_failed': 0,
+            'files_downloaded': 0,
+            'files_skipped': 0
+        }
+        
         # Inspect available runs to get manifest information
         inspection_result = source.inspect_available_runs(period)
         runs_data = inspection_result.get('runs_data', [])
         
         if not runs_data:
             self.stdout.write(self.style.WARNING(f"No runs found for source {source.name}"))
-            return
+            return source_stats
         
         self.stdout.write(f"Found {len(runs_data)} runs")
         
@@ -127,8 +289,19 @@ class Command(BaseCommand):
             run_dir = os.path.join(base_output_dir, run_id)
             os.makedirs(run_dir, exist_ok=True)
             
-            # Process this run
-            self._process_run(source, run_info, run_dir, overwrite, skip_csv)
+            try:
+                # Process this run and track files downloaded/skipped
+                run_stats = self._process_run(source, run_info, run_dir, overwrite, skip_csv)
+                source_stats['runs_processed'] += 1
+                
+                if run_stats:
+                    source_stats['files_downloaded'] += run_stats.get('files_downloaded', 0)
+                    source_stats['files_skipped'] += run_stats.get('files_skipped', 0)
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f"Error processing run {run_id}: {e}"))
+                source_stats['runs_failed'] += 1
+                
+        return source_stats
 
     def _process_run(self, source, run_info, run_dir, overwrite, skip_csv):
         """Process downloads for a single run"""
@@ -136,103 +309,197 @@ class Command(BaseCommand):
         blob_name = run_info.get('blob_name')
         end_date = run_info.get('end_date')
         
+        # Initialize run statistics
+        run_stats = {
+            'files_downloaded': 0,
+            'files_skipped': 0
+        }
+        
         self.stdout.write(f"Processing run: {run_id} (end date: {end_date})")
         
-        # Download manifest
-        manifest_path = os.path.join(run_dir, "manifest.json")
-        if not os.path.exists(manifest_path) or overwrite:
-            # Get manifest data
-            blob_list, container_url = source.list_blobs()
-            
-            # Find the manifest blob
-            manifest_blob = None
-            for blob in blob_list:
-                if blob.name == blob_name:
-                    manifest_blob = blob
-                    break
-            
-            if not manifest_blob:
-                self.stdout.write(self.style.ERROR(f"Could not find manifest blob: {blob_name}"))
-                return
-            
-            # Download and save manifest
-            manifest_info = source.get_manifest_data(manifest_blob, container_url)
-            manifest_data = manifest_info['manifest_data']
-            
-            with open(manifest_path, "w", encoding="utf-8") as fh:
-                json.dump(manifest_data, fh, indent=2)
-            
-            self.stdout.write(self.style.SUCCESS(f"  ✓ Manifest saved to {manifest_path}"))
-            
-            # Download CSV if needed
-            if not skip_csv:
-                try:
-                    csv_blob_data, csv_blob_name = source.download_csv_blob(manifest_data, container_url)
-                    
-                    # Save CSV file
-                    csv_filename = os.path.basename(csv_blob_name)
-                    csv_path = os.path.join(run_dir, csv_filename)
-                    
-                    with open(csv_path, "wb") as fh:
-                        fh.write(csv_blob_data)
-                    
-                    download_size = BillingBlobSource.format_bytes(len(csv_blob_data))
-                    self.stdout.write(self.style.SUCCESS(f"  ✓ CSV file ({download_size}) saved to {csv_path}"))
-                    
-                    # If it's a gzipped file, also save decompressed version
-                    if csv_filename.endswith('.gz'):
-                        import gzip
-                        decompressed_path = os.path.join(run_dir, os.path.splitext(csv_filename)[0])
-                        
-                        with gzip.open(csv_path, "rb") as f_in, open(decompressed_path, "wb") as f_out:
-                            f_out.write(f_in.read())
-                            
-                        self.stdout.write(self.style.SUCCESS(f"  ✓ Decompressed CSV saved to {decompressed_path}"))
-                except Exception as e:
-                    self.stdout.write(self.style.ERROR(f"  ✗ Error downloading CSV: {e}"))
+        # Get blobs data
+        blob_list, container_url = source.list_blobs()
+        
+        # Find the manifest blob
+        manifest_blob = self._find_manifest_blob(blob_list, blob_name)
+        if not manifest_blob:
+            self.stdout.write(self.style.ERROR(f"Could not find manifest blob: {blob_name}"))
+            return run_stats
+        
+        # Process the manifest
+        manifest_result = self._process_manifest(source, manifest_blob, container_url, run_dir, overwrite)
+        if manifest_result:
+            manifest_info = manifest_result['manifest_info']
+            if manifest_result['status'] == 'downloaded':
+                run_stats['files_downloaded'] += 1
+            elif manifest_result['status'] == 'skipped':
+                run_stats['files_skipped'] += 1
         else:
-            self.stdout.write(f"  ✓ Manifest already exists at {manifest_path} (use --overwrite to replace)")
+            return run_stats
+            
+        # Process CSV if needed
+        if not skip_csv:
+            csv_result = self._process_csv(source, manifest_info, container_url, run_dir, overwrite)
+            if csv_result:
+                if csv_result.get('status') == 'downloaded':
+                    run_stats['files_downloaded'] += 1
+                    # If decompressed, count as another file
+                    if csv_result.get('decompressed', False):
+                        run_stats['files_downloaded'] += 1
+                elif csv_result.get('status') == 'skipped':
+                    run_stats['files_skipped'] += 1
             
         # Save run metadata
-        metadata_path = os.path.join(run_dir, "run_metadata.json")
-        if not os.path.exists(metadata_path) or overwrite:
-            # Get additional info from the manifest
-            run_info = {}
-            csv_url = None
-            
-            if 'manifest_data' in manifest_info:
-                run_info = manifest_info['manifest_data'].get('runInfo', {})
-                # Extract CSV URL if available
-                blob_data = manifest_info['manifest_data'].get('blobs', [{}])[0]
-                if blob_data.get('blobName'):
-                    csv_url = f"{container_url}/{blob_data.get('blobName')}"
-            
-            with open(metadata_path, "w", encoding="utf-8") as fh:
-                metadata = {
-                    "run_id": run_id,
-                    "end_date": str(end_date) if end_date else None,
-                    "blob_name": blob_name,
-                    "manifest_url": f"{container_url}/{blob_name}",
-                    "csv_url": csv_url,
-                    "source_name": source.name,
-                    "base_folder": source.base_folder,
-                    "download_timestamp": datetime.now().isoformat(),
+        metadata_result = self._save_run_metadata(run_info, run_id, end_date, blob_name, container_url, 
+                                               manifest_info, source, run_dir, overwrite)
+        if metadata_result:
+            if metadata_result.get('status') == 'downloaded':
+                run_stats['files_downloaded'] += 1
+            elif metadata_result.get('status') == 'skipped':
+                run_stats['files_skipped'] += 1
+        
+        return run_stats
+    
+    def _find_manifest_blob(self, blob_list, blob_name):
+        """Find a specific manifest blob in the blob list"""
+        for blob in blob_list:
+            if blob.name == blob_name:
+                return blob
+        return None
+    
+    def _process_manifest(self, source, manifest_blob, container_url, run_dir, overwrite):
+        """Download and process the manifest file"""
+        manifest_path = os.path.join(run_dir, "manifest.json")
+        
+        # Skip if file exists and we're not overwriting
+        if os.path.exists(manifest_path) and not overwrite:
+            self.stdout.write(f"  ✓ Manifest already exists at {manifest_path} (use --overwrite to replace)")
+            # Return existing manifest data if possible
+            try:
+                with open(manifest_path, 'r', encoding='utf-8') as f:
+                    manifest_data = json.load(f)
+                return {
+                    'status': 'skipped',
+                    'manifest_info': {'manifest_data': manifest_data}
                 }
-                
-                # Add additional metadata from manifest if available
-                if run_info:
-                    metadata["report_name"] = run_info.get("reportName")
-                    metadata["submitted_time"] = run_info.get("submittedTime")
-                    metadata["start_date"] = run_info.get("startDate")
-                    metadata["end_date"] = run_info.get("endDate")
-                    metadata["report_type"] = run_info.get("reportType")
-                    # Extract any other useful info from run_info
-                
-                json.dump(metadata, fh, indent=2)
+            except Exception:
+                return None
+        
+        # Download and save manifest
+        manifest_info = source.get_manifest_data(manifest_blob, container_url)
+        manifest_data = manifest_info['manifest_data']
+        
+        with open(manifest_path, "w", encoding="utf-8") as fh:
+            json.dump(manifest_data, fh, indent=2)
+        
+        self.stdout.write(self.style.SUCCESS(f"  ✓ Manifest saved to {manifest_path}"))
+        return {
+            'status': 'downloaded',
+            'manifest_info': manifest_info
+        }
+    
+    def _process_csv(self, source, manifest_info, container_url, run_dir, overwrite):
+        """Download and process the CSV file"""
+        manifest_data = manifest_info['manifest_data']
+        result = {'status': None, 'decompressed': False}
+        
+        try:
+            csv_blob_data, csv_blob_name = source.download_csv_blob(manifest_data, container_url)
             
-            self.stdout.write(self.style.SUCCESS(f"  ✓ Enhanced run metadata saved to {metadata_path}"))
-        else:
+            # Save CSV file
+            csv_filename = os.path.basename(csv_blob_name)
+            csv_path = os.path.join(run_dir, csv_filename)
+            
+            # Check if file exists and skip if not overwriting
+            if os.path.exists(csv_path) and not overwrite:
+                self.stdout.write(f"  ✓ CSV file already exists at {csv_path} (use --overwrite to replace)")
+                result['status'] = 'skipped'
+                return result
+            
+            # Save the CSV file
+            with open(csv_path, "wb") as fh:
+                fh.write(csv_blob_data)
+            
+            download_size = BillingBlobSource.format_bytes(len(csv_blob_data))
+            self.stdout.write(self.style.SUCCESS(f"  ✓ CSV file ({download_size}) saved to {csv_path}"))
+            result['status'] = 'downloaded'
+            
+            # Handle decompression if needed
+            if csv_filename.endswith('.gz'):
+                decompressed = self._decompress_if_needed(csv_path, run_dir)
+                if decompressed:
+                    result['decompressed'] = True
+            
+            return result
+            
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"  ✗ Error downloading CSV: {e}"))
+            result['status'] = 'error'
+            return result
+    
+    def _decompress_if_needed(self, csv_path, run_dir):
+        """Decompress gzipped files if needed"""
+        csv_filename = os.path.basename(csv_path)
+        if not csv_filename.endswith('.gz'):
+            return False
+            
+        try:
+            import gzip
+            decompressed_path = os.path.join(run_dir, os.path.splitext(csv_filename)[0])
+            
+            with gzip.open(csv_path, "rb") as f_in, open(decompressed_path, "wb") as f_out:
+                f_out.write(f_in.read())
+                
+            self.stdout.write(self.style.SUCCESS(f"  ✓ Decompressed CSV saved to {decompressed_path}"))
+            return True
+        except Exception as e:
+            self.stdout.write(self.style.ERROR(f"  ✗ Error decompressing file: {e}"))
+            return False
+    
+    def _save_run_metadata(self, run_info, run_id, end_date, blob_name, container_url, 
+                        manifest_info, source, run_dir, overwrite):
+        """Save detailed run metadata to a JSON file"""
+        metadata_path = os.path.join(run_dir, "run_metadata.json")
+        
+        # Skip if file exists and we're not overwriting
+        if os.path.exists(metadata_path) and not overwrite:
             self.stdout.write(f"  ✓ Run metadata already exists at {metadata_path} (use --overwrite to replace)")
+            return {'status': 'skipped'}
+        
+        # Initialize metadata dict
+        metadata = {
+            "run_id": run_id,
+            "end_date": str(end_date) if end_date else None,
+            "blob_name": blob_name,
+            "manifest_url": f"{container_url}/{blob_name}",
+            "source_name": source.name,
+            "base_folder": source.base_folder,
+            "download_timestamp": datetime.now().isoformat(),
+        }
+        
+        # Add CSV URL and additional info if manifest data is available
+        if 'manifest_data' in manifest_info:
+            run_info_from_manifest = manifest_info['manifest_data'].get('runInfo', {})
+            
+            # Extract CSV URL if available
+            blob_data = manifest_info['manifest_data'].get('blobs', [{}])[0]
+            if blob_data.get('blobName'):
+                csv_url = f"{container_url}/{blob_data.get('blobName')}"
+                metadata["csv_url"] = csv_url
+            
+            # Add additional metadata from manifest
+            metadata["report_name"] = run_info_from_manifest.get("reportName")
+            metadata["submitted_time"] = run_info_from_manifest.get("submittedTime")
+            metadata["start_date"] = run_info_from_manifest.get("startDate")
+            metadata["end_date"] = run_info_from_manifest.get("endDate")
+            metadata["report_type"] = run_info_from_manifest.get("reportType")
+        
+        # Save the metadata file
+        with open(metadata_path, "w", encoding="utf-8") as fh:
+            json.dump(metadata, fh, indent=2)
+        
+        self.stdout.write(self.style.SUCCESS(f"  ✓ Enhanced run metadata saved to {metadata_path}"))
+        return {'status': 'downloaded'}
     
     def _list_source_files(self, source, period):
         """List all files for a billing source with full URLs"""
