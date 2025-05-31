@@ -4,7 +4,7 @@ All cost related API endpoints accept the same set of query parameters. These pa
 
 | Parameter | Description |
 |-----------|-------------|
-| `date` | Billing date. When omitted, the API uses the latest available data. |
+| `date` | Billing date. When omitted, the API uses the latest available data. When provided, results are taken from the newest snapshot for each subscription on that day. |
 | `subscription_id` | Filter by subscription ID. |
 | `resource_group` | Filter by Azure resource group. Names are stored in lowercase. |
 | `location` | Azure region of the resource. |

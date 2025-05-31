@@ -35,7 +35,9 @@ unless `API_AUTH_DISABLED` is set to `True` in settings.
 
 When requesting cost entries for a specific billing date via
 `/api/cost-entries/?date=YYYY-MM-DD`, the API returns data from the most recent
-snapshot that includes that date.
+snapshot that includes that date. Summary endpoints apply the same rule but
+determine the newest snapshot per subscription for the selected day to avoid
+duplicates.
 
 To discover which billing dates are present, call
 `/api/costs/available-report-dates/?month=YYYY-MM` (defaults to the current

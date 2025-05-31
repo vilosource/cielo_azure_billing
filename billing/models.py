@@ -385,6 +385,26 @@ class Meter(models.Model):
         return self.name
 
 
+class CostEntryQuerySet(models.QuerySet):
+    """Queryset utilities for :class:`CostEntry`."""
+
+    def latest_for_day(self, target_date):
+        """Return entries from the latest snapshot per subscription for ``target_date``."""
+        from django.db.models import Max
+
+        latest_ids = (
+            self.model.objects.filter(
+                date=target_date,
+                snapshot__status=CostReportSnapshot.Status.COMPLETE,
+            )
+            .values("subscription_id")
+            .annotate(latest_id=Max("snapshot_id"))
+            .values_list("latest_id", flat=True)
+        )
+
+        return self.filter(date=target_date, snapshot_id__in=list(latest_ids))
+
+
 class CostEntry(models.Model):
     snapshot = models.ForeignKey(CostReportSnapshot, on_delete=models.CASCADE)
     date = models.DateField(db_index=True)
@@ -406,6 +426,8 @@ class CostEntry(models.Model):
     publisher_name = models.CharField(max_length=255, null=True, blank=True)
     cost_center = models.CharField(max_length=255, null=True, blank=True)
     tags = models.JSONField(null=True, blank=True)
+
+    objects = CostEntryQuerySet.as_manager()
 
     def __str__(self):
         return f"{self.date} - {self.subscription}"

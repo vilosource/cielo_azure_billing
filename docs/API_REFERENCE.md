@@ -72,7 +72,7 @@ The API uses token authentication via Django REST Framework. When the setting `A
 All summary endpoints inherit from `BaseSummaryView` located in `billing/views.py`. The `get` method performs the following steps:
 
 1. Resolve the latest completed `CostReportSnapshot` for each active `BillingBlobSource` using `get_latest_snapshots()`.
-2. Filter `CostEntry` rows to include only those snapshots (and the requested billing date if provided).
+2. If a `date` is supplied, determine the newest snapshot for each subscription on that day and filter `CostEntry` rows to those IDs.
 3. Apply additional filters based on the query parameters.
 4. Group the remaining entries by the configured fields and sum `cost_in_usd` and `cost_in_billing_currency`.
 5. Cache the result for subsequent requests.
@@ -88,9 +88,11 @@ class BaseSummaryView(APIView):
         date_str = request.GET.get('date')
         ...
         snapshots, missing = get_latest_snapshots(date)
-        queryset = CostEntry.objects.filter(snapshot_id__in=[s.id for s in snapshots])
         if date:
-            queryset = queryset.filter(date=date)
+            ids = latest_snapshot_ids_for_date(date)
+            queryset = CostEntry.objects.filter(snapshot_id__in=ids, date=date)
+        else:
+            queryset = CostEntry.objects.filter(snapshot_id__in=[s.id for s in snapshots])
         filterset = self.filterset_class(request.GET, queryset=queryset)
         data = (
             filterset.qs
@@ -125,6 +127,21 @@ def get_latest_snapshots(date=None):
             reason = 'no snapshot for date' if date else 'no snapshot'
             missing.append({'name': source.name, 'reason': reason})
     return snapshots, missing
+```
+
+To locate the newest snapshot for each subscription on a particular day, the helper below is used:
+
+```python
+def latest_snapshot_ids_for_date(date):
+    return (
+        CostEntry.objects.filter(
+            date=date,
+            snapshot__status=CostReportSnapshot.Status.COMPLETE,
+        )
+        .values("subscription_id")
+        .annotate(latest_id=Max("snapshot_id"))
+        .values_list("latest_id", flat=True)
+    )
 ```
 
 The API response from a summary endpoint includes the date used, counts of sources included or missing and the aggregated data list.
