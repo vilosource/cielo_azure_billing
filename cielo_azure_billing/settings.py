@@ -16,7 +16,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'drf_spectacular',
     'django_filters',
-    'billing',
+    'cielo.azure.cost_analysis',
 ]
 
 MIDDLEWARE = [
@@ -27,7 +27,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'billing.middleware.RequestLoggingMiddleware',
+    'cielo.azure.cost_analysis.middleware.RequestLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'cielo_azure_billing.urls'
@@ -35,7 +35,7 @@ ROOT_URLCONF = 'cielo_azure_billing.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'billing' / 'templates'],
+        'DIRS': [BASE_DIR / 'src' / 'cielo' / 'azure' / 'cost_analysis' / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -69,7 +69,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'billing.auth.ConditionalTokenAuthentication',
+        'cielo.azure.cost_analysis.auth.ConditionalTokenAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -117,7 +117,7 @@ LOGGING = {
         },
         'file': {
             'class': 'logging.FileHandler',
-            'filename': 'billing.log',
+            'filename': 'cost_analysis.log',
             'formatter': 'verbose',
             'level': 'DEBUG',
         },
@@ -137,17 +137,17 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
-        'billing': {
+        'cielo.azure.cost_analysis': {
             'handlers': ['console_debug', 'file'],
             'level': 'DEBUG',
             'propagate': False,
         },
-        'billing.views': {
+        'cielo.azure.cost_analysis.views': {
             'handlers': ['console_debug', 'file'],
             'level': 'DEBUG',
             'propagate': False,
         },
-        'billing.management': {
+        'cielo.azure.cost_analysis.management': {
             'handlers': ['console_debug', 'file'], 
             'level': 'DEBUG',
             'propagate': False,
