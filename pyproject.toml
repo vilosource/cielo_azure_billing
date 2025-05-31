@@ -1,9 +1,10 @@
 [tool.poetry]
-name = "cielo-azure-billing"
+name = "cielo.azure.cost_analysis"
 version = "0.1.0"
 description = ""
 authors = [" vilosource <vilosource@users.noreply.github.com>"]
 readme = "README.md"
+packages = [{ include = "cielo", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.12"
